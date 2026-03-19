@@ -1,16 +1,19 @@
 import React from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Bird, Egg, ThermometerSun, Wheat, Settings } from 'lucide-react';
+import { LayoutDashboard, Bird, Egg, ThermometerSun, Wheat, Settings, Users } from 'lucide-react';
 
-export const Sidebar = () => {
-  const navItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
-    { name: 'Flock Management', icon: Bird, href: '/dashboard/flocks' },
-    { name: 'Egg Production', icon: Egg, href: '/dashboard/eggs' },
-    { name: 'Climate Control', icon: ThermometerSun, href: '/dashboard/climate' },
-    { name: 'Feed & Nutrition', icon: Wheat, href: '/dashboard/feed' },
-    { name: 'Settings', icon: Settings, href: '/dashboard/settings' },
+export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
+  const allNavItems = [
+    { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', roles: ['OWNER', 'MANAGER', 'WORKER'] },
+    { name: 'Flock Management', icon: Bird, href: '/dashboard/flocks', roles: ['OWNER', 'MANAGER', 'WORKER'] },
+    { name: 'Egg Production', icon: Egg, href: '/dashboard/eggs', roles: ['OWNER', 'MANAGER', 'WORKER'] },
+    { name: 'Climate Control', icon: ThermometerSun, href: '/dashboard/climate', roles: ['OWNER', 'MANAGER', 'WORKER'] },
+    { name: 'Feed & Nutrition', icon: Wheat, href: '/dashboard/feed', roles: ['OWNER', 'MANAGER', 'WORKER'] },
+    { name: 'Team Management', icon: Users, href: '/dashboard/team', roles: ['OWNER', 'MANAGER'] },
+    { name: 'Settings', icon: Settings, href: '/dashboard/settings', roles: ['OWNER', 'MANAGER'] },
   ];
+
+  const navItems = allNavItems.filter(item => item.roles.includes(role));
 
   return (
     <div className="w-64 bg-green-900 min-h-screen text-white flex flex-col">

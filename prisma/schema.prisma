@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  OWNER
+  MANAGER
+  WORKER
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -16,6 +22,8 @@ model User {
   accounts      Account[]
   sessions      Session[]
   farms         Farm[]
+  role          Role      @default(OWNER)
+  memberships   FarmMember[]
   batches       Batch[]
   feedingLogs   FeedingLog[]
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -73,6 +81,8 @@ model Farm {
   userId    String         @default("user_placeholder") // Multi-tenancy
   user      User           @relation(fields: [userId], references: [id])
   houses    PoultryHouse[]
+  members     FarmMember[]
+  invitations Invitation[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
@@ -174,4 +184,34 @@ model ProductionLog {
 
   @@index([userId])
   @@map("production_logs")
+}
+
+model FarmMember {
+  id      Int      @id @default(autoincrement())
+  farmId  Int
+  userId  String
+  role    Role     @default(WORKER)
+  farm    Farm     @relation(fields: [farmId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([farmId, userId])
+  @@map("farm_members")
+}
+
+model Invitation {
+  id        Int      @id @default(autoincrement())
+  email     String
+  farmId    Int
+  role      Role     @default(WORKER)
+  status    String   @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  farm      Farm     @relation(fields: [farmId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([email, farmId])
+  @@map("invitations")
 }
