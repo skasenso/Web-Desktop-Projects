@@ -4,18 +4,29 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { createBatch } from '@/lib/actions/dashboard-actions';
+import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   batchName: z.string().min(2, "Batch name is required"),
   breed: z.enum(["Broiler", "Layer"]),
   initialQuantity: z.number().min(1, "Quantity must be at least 1"),
   hatchDate: z.string().min(1, "Hatch date is required"),
-  houseNumber: z.string().min(1, "House number is required"),
+  houseId: z.string().min(1, "House selection is required"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function RegisterBatchForm() {
+interface RegisterBatchFormProps {
+  houses: Array<{
+    id: number;
+    houseNumber: string;
+  }>;
+}
+
+export function RegisterBatchForm({ houses }: RegisterBatchFormProps) {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const {
     register,
     handleSubmit,
@@ -27,9 +38,27 @@ export function RegisterBatchForm() {
     },
   });
 
-  const onSubmit = (data: FormValues) => {
-    console.log("Submitting new batch:", data);
-    alert(JSON.stringify(data, null, 2));
+  const onSubmit = async (data: FormValues) => {
+    setIsSubmitting(true);
+    try {
+      const result = await createBatch({
+        houseId: parseInt(data.houseId),
+        breedType: data.breed,
+        initialCount: data.initialQuantity,
+        arrivalDate: data.hatchDate,
+      });
+
+      if (result.success) {
+        alert("Batch registered successfully!");
+        router.refresh();
+      } else {
+        alert("Error: " + result.error);
+      }
+    } catch (error) {
+      alert("An unexpected error occurred.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -75,13 +104,19 @@ export function RegisterBatchForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">House Number</label>
-            <input
-              {...register("houseNumber")}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors"
-              placeholder="e.g., H-01"
-            />
-            {errors.houseNumber && <p className="text-red-500 text-xs mt-1">{errors.houseNumber.message}</p>}
+            <label className="block text-sm font-medium text-gray-700 mb-1">House</label>
+            <select
+              {...register("houseId")}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors bg-white text-gray-900"
+            >
+              <option value="">Select House</option>
+              {houses.map((house) => (
+                <option key={house.id} value={house.id.toString()}>
+                  {house.houseNumber}
+                </option>
+              ))}
+            </select>
+            {errors.houseId && <p className="text-red-500 text-xs mt-1">{errors.houseId.message}</p>}
           </div>
         </div>
 
@@ -100,9 +135,10 @@ export function RegisterBatchForm() {
         <div className="pt-4 border-t border-gray-100 mt-6">
           <button
             type="submit"
-            className="w-full bg-green-800 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-md shadow-sm transition-colors focus:outline-none z-10"
+            disabled={isSubmitting}
+            className="w-full bg-green-800 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-md shadow-sm transition-colors focus:outline-none z-10 disabled:opacity-50"
           >
-            Register Batch
+            {isSubmitting ? "Registering..." : "Register Batch"}
           </button>
         </div>
       </form>

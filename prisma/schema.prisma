@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  clerkId   String   @unique // For Clerk integration
+  farms     Farm[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model Farm {
+  id        Int            @id @default(autoincrement())
+  name      String
+  location  String?
+  capacity  Int
+  userId    String         @default("user_placeholder") // Multi-tenancy
+  user      User           @relation(fields: [userId], references: [id])
+  houses    PoultryHouse[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([userId])
+  @@map("farms")
+}
+
+model PoultryHouse {
+  id                 Int             @id @default(autoincrement())
+  farmId             Int
+  houseNumber        String
+  capacity           Int
+  currentTemperature Decimal?        @db.Decimal(5, 2)
+  currentHumidity    Decimal?        @db.Decimal(5, 2)
+  userId             String          @default("user_placeholder") // Multi-tenancy
+  farm               Farm            @relation(fields: [farmId], references: [id])
+  batches            Batch[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([userId])
+  @@map("poultry_houses")
+}
+
+model Batch {
+  id             Int             @id @default(autoincrement())
+  houseId        Int
+  breedType      String
+  initialCount   Int
+  currentCount   Int
+  arrivalDate    DateTime
+  status         String          @default("active")
+  userId         String          @default("user_placeholder") // Multi-tenancy
+  house          PoultryHouse    @relation(fields: [houseId], references: [id])
+  productionLogs ProductionLog[]
+  feedingLogs    FeedingLog[]
+  healthRecords  HealthRecord[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([userId])
+  @@map("batches")
+}
+
+model FeedInventory {
+  id          Int          @id @default(autoincrement())
+  feedType    String
+  stockLevel  Decimal      @db.Decimal(10, 2)
+  unit        String
+  userId      String       @default("user_placeholder") // Multi-tenancy
+  feedingLogs FeedingLog[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId])
+  @@map("feed_inventory")
+}
+
+model FeedingLog {
+  id             Int           @id @default(autoincrement())
+  batchId        Int?          @map("batch_id")
+  feedTypeId     Int?          @map("feed_type_id")
+  amountConsumed Decimal       @db.Decimal(10, 2) @map("amount_consumed")
+  logDate        DateTime      @default(now()) @map("log_date")
+  batch          Batch?        @relation(fields: [batchId], references: [id])
+  feedInventory  FeedInventory? @relation(fields: [feedTypeId], references: [id])
+
+  @@map("daily_feeding_logs")
+}
+
+model HealthRecord {
+  id          Int      @id @default(autoincrement())
+  batchId     Int?     @map("batch_id")
+  recordType  String?  @db.VarChar(50) @map("record_type")
+  description String?  @db.Text
+  recordDate  DateTime @default(now()) @db.Date @map("record_date")
+  batch       Batch?   @relation(fields: [batchId], references: [id])
+
+  @@map("health_records")
+}
+
+model ProductionLog {
+  id             Int      @id @default(autoincrement())
+  batchId        Int
+  eggsCollected  Int?
+  damagedEggs    Int?
+  birdWeight     Decimal? @db.Decimal(5, 2)
+  mortalityCount Int      @default(0)
+  logDate        DateTime
+  userId         String   @default("user_placeholder") // Multi-tenancy
+  batch          Batch    @relation(fields: [batchId], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@map("production_logs")
+}
