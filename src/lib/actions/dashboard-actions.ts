@@ -2,12 +2,20 @@
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
 
-const MOCK_USER_ID = 'user_placeholder'; // Placeholder for Clerk/NextAuth
+// We'll replace MOCK_USER_ID with real IDs from the session
+async function getUserId() {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Unauthorized')
+  return session.user.id
+}
 
 
 export async function getDashboardStats() {
-  return await (prisma as any).$withUser(MOCK_USER_ID, async (tx: any) => {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
     const totalBirds = await tx.batch.aggregate({
       where: { status: 'active' },
       _sum: { currentCount: true }
@@ -71,7 +79,8 @@ export async function createBatch(data: {
   initialCount: number
   arrivalDate: string
 }) {
-  return await (prisma as any).$withUser(MOCK_USER_ID, async (tx: any) => {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
     const batch = await tx.batch.create({
       data: {
         houseId: data.houseId,
@@ -80,7 +89,7 @@ export async function createBatch(data: {
         currentCount: data.initialCount,
         arrivalDate: new Date(data.arrivalDate),
         status: 'active',
-        userId: MOCK_USER_ID
+        userId: userId
       }
     })
     revalidatePath('/dashboard')
@@ -127,7 +136,8 @@ export async function logFeeding(data: {
 }
 
 export async function getHouses() {
-  return await (prisma as any).$withUser(MOCK_USER_ID, async (tx: any) => {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
     return await tx.poultryHouse.findMany()
   }).catch((error: any) => {
     console.error('Error fetching houses:', error)
@@ -136,7 +146,8 @@ export async function getHouses() {
 }
 
 export async function getAllBatches() {
-  return await (prisma as any).$withUser(MOCK_USER_ID, async (tx: any) => {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
     return await tx.batch.findMany({
       include: {
         house: true,
@@ -153,7 +164,8 @@ export async function getAllBatches() {
 
 
 export async function updateBatchStatus(id: number, status: string) {
-  return await (prisma as any).$withUser(MOCK_USER_ID, async (tx: any) => {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
     const batch = await tx.batch.update({
       where: { id },
       data: { status },
@@ -174,7 +186,8 @@ export async function logProduction(data: {
   birdWeight?: number
   mortalityCount: number
 }) {
-  return await (prisma as any).$withUser(MOCK_USER_ID, async (tx: any) => {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
     const log = await tx.productionLog.create({
       data: {
         batchId: data.batchId,
@@ -183,7 +196,7 @@ export async function logProduction(data: {
         birdWeight: data.birdWeight,
         mortalityCount: data.mortalityCount,
         logDate: new Date(),
-        userId: MOCK_USER_ID
+        userId: userId
       }
     })
 
@@ -206,6 +219,81 @@ export async function logProduction(data: {
     console.error('Error logging production:', error)
     return { success: false, error: 'Failed to log production' }
   })
+}
+
+export async function updateFarmInfo(data: { name: string, location?: string, capacity: number }) {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const farm = await tx.farm.findFirst({ where: { userId } })
+    if (!farm) throw new Error('Farm not found')
+    
+    const updatedFarm = await tx.farm.update({
+      where: { id: farm.id },
+      data: {
+        name: data.name,
+        location: data.location,
+        capacity: data.capacity
+      }
+    })
+    revalidatePath('/dashboard/settings')
+    return { success: true, farm: updatedFarm }
+  }).catch((error: any) => {
+    console.error('Error updating farm info:', error)
+    return { success: false, error: 'Failed to update farm info' }
+  })
+}
+
+export async function createHouse(data: { houseNumber: string, capacity: number }) {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const farm = await tx.farm.findFirst({ where: { userId } })
+    if (!farm) throw new Error('Farm not found')
+
+    const house = await tx.poultryHouse.create({
+      data: {
+        houseNumber: data.houseNumber,
+        capacity: data.capacity,
+        farmId: farm.id,
+        userId: userId
+      }
+    })
+    revalidatePath('/dashboard/settings')
+    revalidatePath('/dashboard')
+    return { success: true, house }
+  }).catch((error: any) => {
+    console.error('Error creating house:', error)
+    return { success: false, error: 'Failed to create house' }
+  })
+}
+
+export async function onboardFarmer(data: { name: string, location: string, capacity: number }) {
+  const userId = await getUserId()
+  try {
+    const farm = await prisma.farm.create({
+      data: {
+        name: data.name,
+        location: data.location,
+        capacity: data.capacity,
+        userId: userId
+      }
+    })
+    revalidatePath('/dashboard')
+    return { success: true, farm }
+  } catch (error) {
+    console.error('Error onboarding farmer:', error)
+    return { success: false, error: 'Failed to onboard farmer' }
+  }
+}
+
+export async function checkOnboardingStatus() {
+  const session = await auth()
+  if (!session?.user?.id) return { isOnboarded: false, error: 'Unauthorized' }
+  
+  const farm = await prisma.farm.findFirst({
+    where: { userId: session.user.id }
+  })
+  
+  return { isOnboarded: !!farm }
 }
 
 
