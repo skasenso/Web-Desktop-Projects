@@ -64,6 +64,7 @@ export async function getDashboardStats() {
       lowFeedAlertsCount: lowFeedAlerts.length,
       activeBatches: activeBatches.map((batch: any) => ({
         id: `FLK-${batch.id.toString().padStart(3, '0')}`,
+        numericId: batch.id,
         breed: batch.breedType || 'Unknown',
         quantity: batch.currentCount,
         hatchDate: batch.arrivalDate.toISOString(),
@@ -133,7 +134,7 @@ export async function logFeeding(data: {
       return log
     })
     revalidatePath('/dashboard')
-    return { success: true, log: result }
+    return { success: true, log: { ...result, amountConsumed: Number(result.amountConsumed) } }
   } catch (error) {
     console.error('Error logging feeding:', error)
     return { success: false, error: 'Failed to log feeding' }
@@ -153,7 +154,7 @@ export async function getHouses() {
 export async function getAllBatches() {
   const userId = await getUserId()
   return await (prisma as any).$withUser(userId, async (tx: any) => {
-    return await tx.batch.findMany({
+    const batches = await tx.batch.findMany({
       include: {
         house: true,
       },
@@ -161,6 +162,14 @@ export async function getAllBatches() {
         arrivalDate: 'desc',
       },
     })
+    return batches.map((batch: any) => ({
+      ...batch,
+      house: batch.house ? {
+        ...batch.house,
+        currentTemperature: batch.house.currentTemperature ? Number(batch.house.currentTemperature) : null,
+        currentHumidity: batch.house.currentHumidity ? Number(batch.house.currentHumidity) : null,
+      } : null
+    }))
   }).catch((error: any) => {
     console.error('Error fetching all batches:', error)
     return []
@@ -334,7 +343,7 @@ export async function getAllEggProduction() {
 export async function getAllFeedingLogs() {
   const userId = await getUserId()
   return await (prisma as any).$withUser(userId, async (tx: any) => {
-    return await tx.feedingLog.findMany({
+    const logs = await tx.feedingLog.findMany({
       include: {
         batch: true,
         inventory: true,
@@ -344,6 +353,14 @@ export async function getAllFeedingLogs() {
       },
       take: 50,
     })
+    return logs.map((log: any) => ({
+      ...log,
+      amountConsumed: Number(log.amountConsumed),
+      inventory: log.inventory ? {
+         ...log.inventory,
+         stockLevel: Number(log.inventory.stockLevel)
+      } : null
+    }))
   }).catch((error: any) => {
     console.error('Error fetching feeding logs:', error)
     return []
@@ -353,11 +370,15 @@ export async function getAllFeedingLogs() {
 export async function getAllInventory() {
   const userId = await getUserId()
   return await (prisma as any).$withUser(userId, async (tx: any) => {
-    return await tx.inventory.findMany({
+    const items = await tx.inventory.findMany({
       orderBy: {
         itemName: 'asc',
       },
     })
+    return items.map((item: any) => ({
+      ...item,
+      stockLevel: Number(item.stockLevel)
+    }))
   }).catch((error: any) => {
     console.error('Error fetching inventory:', error)
     return []
@@ -367,7 +388,7 @@ export async function getAllInventory() {
 export async function getAllSales() {
   const userId = await getUserId()
   return await (prisma as any).$withUser(userId, async (tx: any) => {
-    return await tx.sale.findMany({
+    const sales = await tx.sale.findMany({
       include: {
         items: true,
       },
@@ -376,6 +397,15 @@ export async function getAllSales() {
       },
       take: 50,
     })
+    return sales.map((sale: any) => ({
+      ...sale,
+      totalAmount: Number(sale.totalAmount),
+      items: sale.items.map((item: any) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice)
+      }))
+    }))
   }).catch((error: any) => {
     console.error('Error fetching sales:', error)
     return []
@@ -398,4 +428,212 @@ export async function getAllMortalityLogs() {
     console.error('Error fetching mortality logs:', error)
     return []
   })
+}
+
+export async function getBatchDetails(id: number) {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const batch = await tx.batch.findUnique({
+      where: { id },
+      include: {
+        house: true,
+        feedingLogs: {
+          include: { inventory: true },
+          orderBy: { logDate: 'desc' }
+        },
+        mortalityRecords: {
+          orderBy: { logDate: 'desc' }
+        },
+        eggProduction: {
+          orderBy: { logDate: 'desc' }
+        },
+        weightRecords: {
+          orderBy: { logDate: 'desc' }
+        }
+      }
+    })
+
+    if (!batch) return null
+
+    // Serialize Decimals for Client Components
+    return {
+      ...batch,
+      house: batch.house ? {
+        ...batch.house,
+        currentTemperature: batch.house.currentTemperature ? Number(batch.house.currentTemperature) : null,
+        currentHumidity: batch.house.currentHumidity ? Number(batch.house.currentHumidity) : null,
+      } : null,
+      feedingLogs: batch.feedingLogs.map((log: any) => ({
+        ...log,
+        amountConsumed: Number(log.amountConsumed),
+        inventory: log.inventory ? {
+          ...log.inventory,
+          stockLevel: Number(log.inventory.stockLevel)
+        } : null
+      })),
+      weightRecords: batch.weightRecords.map((rec: any) => ({
+        ...rec,
+        averageWeight: Number(rec.averageWeight)
+      }))
+    }
+  }).catch((error: any) => {
+    console.error('Error fetching batch details:', error)
+    return null
+  })
+}
+
+export async function logWeight(data: {
+  batchId: number
+  averageWeight: number
+  logDate: string
+}) {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const record = await tx.weightRecord.create({
+      data: {
+        batchId: data.batchId,
+        averageWeight: data.averageWeight,
+        logDate: new Date(data.logDate),
+        userId: userId
+      }
+    })
+    revalidatePath(`/dashboard/flocks/${data.batchId}`)
+    return { success: true, record }
+  }).catch((error: any) => {
+    console.error('Error logging weight:', error)
+    return { success: false, error: 'Failed to log weight' }
+  })
+}
+
+export async function getInventoryDetails(id: number) {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const item = await tx.inventory.findUnique({
+      where: { id },
+      include: {
+        feedingLogs: {
+          include: { batch: true },
+          orderBy: { logDate: 'desc' }
+        }
+      }
+    })
+
+    if (!item) return null
+
+    return {
+      ...item,
+      stockLevel: Number(item.stockLevel),
+      feedingLogs: item.feedingLogs.map((log: any) => ({
+        ...log,
+        amountConsumed: Number(log.amountConsumed)
+      }))
+    }
+  }).catch((error: any) => {
+    console.error('Error fetching inventory details:', error)
+    return null
+  })
+}
+
+export async function getSaleDetails(id: number) {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const sale = await tx.sale.findUnique({
+      where: { id },
+      include: {
+        items: true
+      }
+    })
+
+    if (!sale) return null
+
+    return {
+      ...sale,
+      totalAmount: Number(sale.totalAmount),
+      items: sale.items.map((item: any) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice)
+      }))
+    }
+  }).catch((error: any) => {
+    console.error('Error fetching sale details:', error)
+    return null
+  })
+}
+
+export async function getGlobalFlockStats() {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const batches = await tx.batch.findMany({
+      include: {
+        mortalityRecords: true,
+        feedingLogs: true,
+        eggProduction: true,
+      }
+    })
+
+    return batches.map((batch: any) => {
+      const totalMortality = batch.mortalityRecords.reduce((acc: number, log: any) => acc + log.count, 0)
+      const feedConsumed = batch.feedingLogs.reduce((acc: number, log: any) => acc + Number(log.amountConsumed), 0)
+      const eggsCollected = batch.eggProduction.reduce((acc: number, log: any) => acc + log.eggsCollected, 0)
+
+      return {
+        ...batch,
+        totalMortality,
+        feedConsumed,
+        eggsCollected,
+        currentQuantity: batch.initialCount - totalMortality
+      }
+    })
+  }).catch((error: any) => {
+    console.error('Error fetching global flock stats:', error)
+    return []
+  })
+}
+
+export async function getGlobalEggStats() {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const logs = await tx.eggProduction.findMany({
+      include: { batch: true },
+      orderBy: { logDate: 'desc' }
+    })
+    return logs
+  }).catch(() => [])
+}
+
+export async function getGlobalSalesStats() {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const sales = await tx.sale.findMany({
+      include: { items: true },
+      orderBy: { saleDate: 'desc' }
+    })
+    return sales.map((sale: any) => ({
+      ...sale,
+      totalAmount: Number(sale.totalAmount),
+      items: sale.items.map((item: any) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice)
+      }))
+    }))
+  }).catch(() => [])
+}
+
+export async function getGlobalFeedStats() {
+  const userId = await getUserId()
+  return await (prisma as any).$withUser(userId, async (tx: any) => {
+    const inventory = await tx.inventory.findMany({
+      include: { feedingLogs: { include: { batch: true } } }
+    })
+    return inventory.map((item: any) => ({
+      ...item,
+      stockLevel: Number(item.stockLevel),
+      feedingLogs: item.feedingLogs.map((log: any) => ({
+        ...log,
+        amountConsumed: Number(log.amountConsumed)
+      }))
+    }))
+  }).catch(() => [])
 }

@@ -28,7 +28,7 @@ export async function createSale(data: {
       }
     })
     revalidatePath('/dashboard/sales')
-    return { success: true, sale }
+    return { success: true, sale: { ...sale, totalAmount: Number(sale.totalAmount) } }
   }).catch((error: any) => {
     console.error('Error creating sale:', error)
     return { success: false, error: 'Failed to create sale' }

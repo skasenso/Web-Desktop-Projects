@@ -1,9 +1,8 @@
 import React from 'react';
-import { Sidebar } from '@/components/layout/Sidebar';
 import { auth } from '@/auth';
 import prisma from '@/lib/db';
 import { redirect } from 'next/navigation';
-import { PageTransition } from '@/components/layout/PageTransition';
+import { SidebarWrapper } from '@/components/layout/SidebarWrapper';
 
 export default async function DashboardLayout({
   children,
@@ -49,20 +48,8 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden selection:bg-emerald-500/30">
-      {/* Decorative Floating Mesh Orbs */}
-      <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full animate-pulse pointer-events-none" />
-      <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-teal-500/10 blur-[120px] rounded-full animate-pulse [animation-delay:2s] pointer-events-none" />
-
-      <Sidebar role={dbUser.role} />
-      
-      <main className="flex-1 flex flex-col relative z-20 h-screen overflow-hidden pl-32">
-        <div className="flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar pt-6 pb-12 px-2 md:px-8">
-          <PageTransition>
-            {children}
-          </PageTransition>
-        </div>
-      </main>
-    </div>
+    <SidebarWrapper role={dbUser.role}>
+      {children}
+    </SidebarWrapper>
   );
 }

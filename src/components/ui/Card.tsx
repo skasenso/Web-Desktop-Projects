@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-export const Card = ({ children, className = '', interactive = true }: { children: React.ReactNode, className?: string, interactive?: boolean }) => {
+export const Card = ({ children, className = '', interactive = false }: { children: React.ReactNode, className?: string, interactive?: boolean }) => {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
 
@@ -39,7 +39,7 @@ export const Card = ({ children, className = '', interactive = true }: { childre
       style={{
         rotateX: interactive ? rotateX : 0,
         rotateY: interactive ? rotateY : 0,
-        transformStyle: "preserve-3d",
+        transformStyle: interactive ? "preserve-3d" : "flat",
       }}
       className={cn(
         "glass-morphism rounded-[2rem] overflow-hidden transition-shadow duration-300 relative group",
@@ -47,7 +47,7 @@ export const Card = ({ children, className = '', interactive = true }: { childre
         className
       )}
     >
-      <div style={{ transform: "translateZ(50px)", transformStyle: "preserve-3d" }}>
+      <div className={cn(interactive && "relative z-10")}>
         {children}
       </div>
       {/* Subtle Inner Glow */}

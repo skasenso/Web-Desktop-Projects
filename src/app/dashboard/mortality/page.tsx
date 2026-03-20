@@ -1,8 +1,9 @@
 import React from 'react';
 import { getAllMortalityLogs } from '@/lib/actions/dashboard-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { XCircle, Activity, History, AlertTriangle } from 'lucide-react';
+import { XCircle, Activity, History, AlertTriangle, Eye } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import Link from 'next/link';
 // Note: CRUD for mortality is already handled inside Flocks page (FlockRowActions -> MortalityForm)
 // This page provides a centralized history view.
 
@@ -55,6 +56,7 @@ export default async function MortalityPage() {
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Batch</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Count</th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Reason</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -71,6 +73,15 @@ export default async function MortalityPage() {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500 font-medium italic">
                   {log.reason || 'Not specified'}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <Link 
+                    href={`/dashboard/flocks/${log.batchId}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-all"
+                  >
+                    <Eye className="h-3 w-3" />
+                    <span>Indept</span>
+                  </Link>
                 </td>
               </tr>
             ))}

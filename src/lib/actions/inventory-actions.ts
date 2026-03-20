@@ -25,7 +25,7 @@ export async function createInventoryItem(data: {
       }
     })
     revalidatePath('/dashboard/feed')
-    return { success: true, item }
+    return { success: true, item: { ...item, stockLevel: Number(item.stockLevel) } }
   }).catch((error: any) => {
     console.error('Error creating inventory item:', error)
     return { success: false, error: 'Failed to create item' }
@@ -45,7 +45,7 @@ export async function updateInventoryItem(id: number, data: {
       data
     })
     revalidatePath('/dashboard/feed')
-    return { success: true, item }
+    return { success: true, item: { ...item, stockLevel: Number(item.stockLevel) } }
   }).catch((error: any) => {
     console.error('Error updating inventory item:', error)
     return { success: false, error: 'Failed to update item' }

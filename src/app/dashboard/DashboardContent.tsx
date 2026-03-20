@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { RegisterBatchForm } from '@/components/forms/RegisterBatchForm';
 import { usePoultryStats } from '@/hooks/usePoultryStats';
 import { motion } from 'framer-motion';
-import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package } from 'lucide-react';
+import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package, Eye } from 'lucide-react';
+import Link from 'next/link';
 
 interface DashboardContentProps {
   stats: {
@@ -20,6 +21,7 @@ interface DashboardContentProps {
       hatchDate: string;
       status: string;
       houseNumber: string;
+      numericId: number;
     }>;
   };
   houses: Array<{
@@ -75,7 +77,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
       <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 items-start">
         
         {/* Total Birds Hero Card - Anchor on the left */}
-        <Card className="md:col-span-2 lg:col-span-2 row-span-2 relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
+        <Card interactive={true} className="md:col-span-2 lg:col-span-2 row-span-2 relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
           <CardHeader>
             <CardTitle>Total Population</CardTitle>
           </CardHeader>
@@ -95,7 +97,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
         </Card>
 
         {/* Top Row: Mortality & Feed */}
-        <Card className="md:col-span-2 lg:col-span-2 bg-red-500/5 border-red-500/20">
+        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-red-500/5 border-red-500/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-red-400">Mortality Rate</CardTitle>
             <Skull className="w-5 h-5 text-red-400/50" />
@@ -106,7 +108,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2 lg:col-span-2 bg-amber-500/5 border-amber-500/20">
+        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-amber-500/5 border-amber-500/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-amber-400">Feed Inventory</CardTitle>
             <Wheat className="w-5 h-5 text-amber-400/50" />
@@ -147,7 +149,17 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                             </div>
                          </div>
                       </div>
-                      <HealthBadge status="Healthy" />
+                       <div className="flex items-center gap-3">
+                         <Link 
+                           href={`/dashboard/flocks/${batch.numericId}`}
+                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all opacity-0 group-hover/batch:opacity-100"
+                           title="Indept Management"
+                         >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-black uppercase tracking-tighter">Indept</span>
+                         </Link>
+                         <HealthBadge status="Healthy" />
+                       </div>
                    </div>
                    <div className="mt-5 space-y-2">
                       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">

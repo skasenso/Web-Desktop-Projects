@@ -22,7 +22,14 @@ export async function updateHouse(id: number, data: {
     })
     revalidatePath('/dashboard/climate')
     revalidatePath('/dashboard/settings')
-    return { success: true, house }
+    return { 
+      success: true, 
+      house: { 
+        ...house, 
+        currentTemperature: house.currentTemperature ? Number(house.currentTemperature) : null,
+        currentHumidity: house.currentHumidity ? Number(house.currentHumidity) : null
+      } 
+    }
   }).catch((error: any) => {
     console.error('Error updating house:', error)
     return { success: false, error: 'Failed to update house' }
