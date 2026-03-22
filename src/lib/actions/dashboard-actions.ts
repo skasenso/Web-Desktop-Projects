@@ -58,10 +58,76 @@ export async function getDashboardStats() {
       }
     })
 
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+    sevenDaysAgo.setHours(0, 0, 0, 0)
+
+    const todayMortality = await tx.mortality.aggregate({
+      where: { logDate: { gte: today } },
+      _sum: { count: true }
+    })
+
+    const todayEggs = await tx.eggProduction.aggregate({
+      where: { logDate: { gte: today } },
+      _sum: { eggsCollected: true }
+    })
+
+    // Fetch raw data for last 7 days for trends
+    const recentEggs = await tx.eggProduction.findMany({
+      where: { logDate: { gte: sevenDaysAgo } },
+      orderBy: { logDate: 'asc' }
+    })
+    
+    const recentFeed = await tx.feedingLog.findMany({
+      where: { logDate: { gte: sevenDaysAgo } },
+      orderBy: { logDate: 'asc' }
+    })
+
+    const recentSales = await tx.sale.findMany({
+      where: { saleDate: { gte: sevenDaysAgo } },
+      orderBy: { saleDate: 'asc' }
+    })
+
+    // Helper to format Date to YYYY-MM-DD
+    const formatDate = (date: Date) => date.toISOString().split('T')[0]
+
+    // Generate last 7 days labels
+    const trendDates = Array.from({length: 7}).map((_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (6 - i))
+      return formatDate(d)
+    })
+
+    const eggTrendData = trendDates.map(date => {
+      const dayTotal = recentEggs.filter((e: any) => formatDate(e.logDate) === date).reduce((sum: number, e: any) => sum + e.eggsCollected, 0)
+      return { date, count: dayTotal }
+    })
+
+    const feedTrendData = trendDates.map(date => {
+      const dayTotal = recentFeed.filter((f: any) => formatDate(f.logDate) === date).reduce((sum: number, f: any) => sum + Number(f.amountConsumed), 0)
+      return { date, count: dayTotal }
+    })
+
+    const revenueTrendData = trendDates.map(date => {
+      const dayTotal = recentSales.filter((s: any) => formatDate(s.saleDate) === date).reduce((sum: number, s: any) => sum + Number(s.totalAmount), 0)
+      return { date, count: dayTotal }
+    })
+
     return {
       totalBirds: totalBirds._sum.currentCount || 0,
       mortalityRate: mortalityRate.toFixed(2),
+      overallDead: mortalityData._sum.count || 0,
+      todayDead: todayMortality._sum.count || 0,
+      totalEggs: eggsData._sum.eggsCollected || 0,
+      todayEggs: todayEggs._sum.eggsCollected || 0,
       lowFeedAlertsCount: lowFeedAlerts.length,
+      lowFeedItems: lowFeedAlerts.map((i: any) => ({ name: i.itemName, stockLevel: Number(i.stockLevel), category: i.category })),
+      eggTrendData,
+      feedTrendData,
+      revenueTrendData,
       activeBatches: activeBatches.map((batch: any) => ({
         id: `FLK-${batch.id.toString().padStart(3, '0')}`,
         numericId: batch.id,

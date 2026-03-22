@@ -7,9 +7,9 @@ import Link from 'next/link';
 
 export default async function FlocksAnalyticsPage() {
   const batches = await getGlobalFlockStats();
-  const activeBatches = batches.filter(b => b.status === 'ACTIVE');
-  const totalBirds = activeBatches.reduce((acc, b) => acc + b.currentQuantity, 0);
-  const totalMortality = batches.reduce((acc, b) => acc + b.totalMortality, 0);
+  const activeBatches = batches.filter((b: any) => b.status === 'ACTIVE');
+  const totalBirds = activeBatches.reduce((acc: number, b: any) => acc + b.currentQuantity, 0);
+  const totalMortality = batches.reduce((acc: number, b: any) => acc + b.totalMortality, 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">

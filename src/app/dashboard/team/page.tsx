@@ -41,21 +41,23 @@ export default function TeamPage() {
     setIsInviting(true);
     setMessage(null);
 
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const emailOrPhone = formData.get('emailOrPhone') as string;
     const role = formData.get('role') as any;
 
     try {
-      const result = await inviteWorker({ email, role });
+      const result = await inviteWorker({ emailOrPhone, role });
       if (result.success) {
-        setMessage({ type: 'success', text: `Invitation sent to ${email}!` });
-        e.currentTarget.reset();
+        setMessage({ type: 'success', text: `Invitation sent to ${emailOrPhone}!` });
+        form.reset();
         await loadTeam();
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to send invitation.' });
       }
-    } catch (err) {
-      setMessage({ type: 'error', text: 'An unexpected error occurred.' });
+    } catch (err: any) {
+      console.error("Client side exception:", err);
+      setMessage({ type: 'error', text: err.message || String(err) || 'An unexpected error occurred.' });
     } finally {
       setIsInviting(false);
     }
@@ -183,7 +185,7 @@ export default function TeamPage() {
                           <Mail className="w-6 h-6" />
                         </div>
                         <div>
-                          <p className="font-black text-white tracking-tight">{invite.email}</p>
+                          <p className="font-black text-white tracking-tight">{invite.email || invite.phoneNumber}</p>
                           <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">Sent {new Date(invite.createdAt).toLocaleDateString()}</p>
                         </div>
                       </div>
@@ -226,11 +228,11 @@ export default function TeamPage() {
                   </div>
                 )}
                 <Input 
-                  label="Email Address"
-                  name="email"
-                  type="email" 
+                  label="Email or Phone Number"
+                  name="emailOrPhone"
+                  type="text" 
                   required
-                  placeholder="staff@example.com"
+                  placeholder="staff@example.com or 0540000000"
                 />
                 <Select 
                   label="Assign Role"

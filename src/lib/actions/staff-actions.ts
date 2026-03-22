@@ -11,10 +11,12 @@ async function getUserId() {
   return session.user.id
 }
 
-export async function inviteWorker(data: { email: string, role: Role }) {
-  const userId = await getUserId()
-  
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+export async function inviteWorker(data: { emailOrPhone: string, role: Role }) {
+  console.log('--- inviteWorker called with:', data);
+  try {
+    const userId = await getUserId()
+    
+    return await (prisma as any).$withUser(userId, async (tx: any) => {
     // Ensure the current user is an OWNER or MANAGER
     const currentUser = await tx.user.findUnique({
       where: { id: userId }
@@ -24,18 +26,31 @@ export async function inviteWorker(data: { email: string, role: Role }) {
       throw new Error('Only Owners or Managers can invite staff')
     }
 
-    const farm = await tx.farm.findFirst({
-      where: { userId: userId }
-    })
+      let farm = await tx.farm.findFirst({
+        where: { userId: userId }
+      })
 
-    if (!farm) throw new Error('Farm not found')
-
-    const existingInvite = await tx.invitation.findUnique({
-      where: {
-        email_farmId: {
-          email: data.email,
-          farmId: farm.id
+      if (!farm) {
+        // If not the owner, check if they are a manager/worker in a farm
+        const membership = await tx.farmMember.findFirst({
+          where: { userId: userId },
+          include: { farm: true }
+        })
+        if (membership) {
+          farm = membership.farm
         }
+      }
+
+      if (!farm) throw new Error('Farm not found. You must create a farm first.')
+
+    const isEmail = data.emailOrPhone.includes('@')
+    const email = isEmail ? data.emailOrPhone : null
+    const phone = isEmail ? null : data.emailOrPhone
+
+    const existingInvite = await tx.invitation.findFirst({
+      where: {
+        farmId: farm.id,
+        OR: isEmail ? [{ email: email }] : [{ phoneNumber: phone }]
       }
     })
 
@@ -54,7 +69,8 @@ export async function inviteWorker(data: { email: string, role: Role }) {
 
     const invitation = await tx.invitation.create({
       data: {
-        email: data.email,
+        email: email,
+        phoneNumber: phone,
         farmId: farm.id,
         role: data.role,
         status: 'PENDING'
@@ -63,25 +79,34 @@ export async function inviteWorker(data: { email: string, role: Role }) {
 
     revalidatePath('/dashboard/team')
     return { success: true, invitation }
-  }).catch((error: any) => {
-    console.error('Error inviting worker:', error)
+    })
+  } catch (error: any) {
+    console.error('Fatal error inviting worker:', error)
     return { success: false, error: error.message }
-  })
+  }
 }
 
 export async function acceptInvitation() {
   const session = await auth()
-  if (!session?.user?.email || !session?.user?.id) return { success: false, error: 'Unauthorized' }
+  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   
-  const userEmail = session.user.email
   const userId = session.user.id
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } })
+      if (!user) return null
+
       // Find pending invitation
+      const orConditions: any[] = []
+      if (user.email) orConditions.push({ email: user.email })
+      if ((user as any).phoneNumber) orConditions.push({ phoneNumber: (user as any).phoneNumber })
+      
+      if (orConditions.length === 0) return null
+
       const invitation = await tx.invitation.findFirst({
         where: { 
-          email: userEmail,
+          OR: orConditions,
           status: 'PENDING'
         }
       })
@@ -113,7 +138,6 @@ export async function acceptInvitation() {
     })
 
     if (result) {
-      revalidatePath('/dashboard')
       return { success: true, membership: result }
     }
     

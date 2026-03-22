@@ -30,7 +30,7 @@ export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
 
   return (
     <aside className="fixed left-6 top-6 bottom-6 w-20 hover:w-64 group transition-all duration-500 ease-out z-50">
-      <div className="h-full glass-pill rounded-[2.5rem] flex flex-col items-stretch py-8 overflow-hidden">
+      <div className="h-full glass-pill rounded-[2.5rem] flex flex-col items-stretch py-8 overflow-visible">
         
         {/* Logo Section */}
         <div className="px-6 mb-10 flex items-center">
@@ -72,18 +72,18 @@ export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
         </nav>
 
         {/* Footer Profile */}
-        <div className="mt-auto px-4 w-full">
+        <div className="mt-auto px-4 w-full pb-4">
            <div className="h-px bg-white/10 mb-6 group-hover:block hidden" />
             <div 
-              onClick={() => signOut({ callbackUrl: '/' })}
+              onClick={() => signOut({ callbackUrl: '/login' })}
               className="flex items-center group-hover:bg-red-500/10 rounded-2xl p-2 transition-all cursor-pointer group/logout"
             >
               <div className="w-10 h-10 rounded-xl bg-emerald-400/20 flex items-center justify-center text-emerald-400 font-bold shrink-0 group-hover:bg-red-500/20 group-hover:text-red-400 transition-colors">
-                A
+                U
               </div>
               <div className="ml-3 overflow-hidden opacity-0 group-hover:opacity-100 transition-all duration-300">
-                <p className="text-xs font-black text-white truncate">Farmer Admin</p>
-                <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Owner</p>
+                <p className="text-xs font-black text-white truncate">Profile</p>
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">{role}</p>
               </div>
               <LogOut className="ml-auto w-5 h-5 text-white/20 group-hover/logout:text-red-400 transition-colors opacity-0 group-hover:opacity-100 mr-2" />
             </div>

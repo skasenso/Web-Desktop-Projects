@@ -88,11 +88,19 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   animate={{ opacity: 1, height: "auto", marginBottom: 24 }}
                   exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                   transition={{ duration: 0.3 }}
+                  className="space-y-4"
                 >
                   <FloatingInput
                     label="Full Name"
                     name="name"
                     type="text"
+                    required
+                    placeholder=" "
+                  />
+                  <FloatingInput
+                    label="Phone Number"
+                    name="phone"
+                    type="tel"
                     required
                     placeholder=" "
                   />

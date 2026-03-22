@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logWeight } from '@/lib/actions/dashboard-actions';
+import { cn } from '@/lib/utils';
 
 interface FlockDetailClientProps {
   batch: any;

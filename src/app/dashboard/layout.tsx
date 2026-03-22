@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import prisma from '@/lib/db';
 import { redirect } from 'next/navigation';
 import { SidebarWrapper } from '@/components/layout/SidebarWrapper';
+import { acceptInvitation } from '@/lib/actions/staff-actions';
 
 export default async function DashboardLayout({
   children,
@@ -11,11 +12,11 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect('/login');
   }
 
-  const dbUser = await prisma.user.findUnique({
+  let dbUser = await prisma.user.findUnique({
     where: { id: session.user.id }
   });
 
@@ -23,7 +24,7 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  const farm = await prisma.farm.findFirst({
+  let farm = await prisma.farm.findFirst({
     where: { 
       OR: [
         { userId: session.user.id },
@@ -32,11 +33,23 @@ export default async function DashboardLayout({
     }
   });
 
-  if (!farm && dbUser.role === 'OWNER') {
+  if (!farm) {
+    // Check if they were invited and accept it automatically!
+    const inviteCheck = await acceptInvitation();
+    if (inviteCheck?.success) {
+      // Re-fetch everything to ensure roles and farms are populated accurately.
+      dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+      farm = await prisma.farm.findFirst({
+        where: { members: { some: { userId: session.user.id } } }
+      });
+    }
+  }
+
+  if (!farm && dbUser?.role === 'OWNER') {
     redirect('/onboarding');
   }
 
-  if (!farm && dbUser.role !== 'OWNER') {
+  if (!farm && dbUser?.role !== 'OWNER') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black/20 backdrop-blur-xl text-white p-8">
         <div className="glass-morphism p-12 rounded-3xl text-center max-w-md">
@@ -48,7 +61,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SidebarWrapper role={dbUser.role}>
+    <SidebarWrapper role={dbUser?.role as any}>
       {children}
     </SidebarWrapper>
   );

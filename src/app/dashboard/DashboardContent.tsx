@@ -1,19 +1,29 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { HealthBadge } from '@/components/ui/HealthBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { RegisterBatchForm } from '@/components/forms/RegisterBatchForm';
 import { usePoultryStats } from '@/hooks/usePoultryStats';
 import { motion } from 'framer-motion';
-import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package, Eye } from 'lucide-react';
+import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package, Eye, DollarSign } from 'lucide-react';
 import Link from 'next/link';
+import { Dialog } from '@/components/ui/Dialog';
+import { formatCurrency } from '@/lib/utils';
 
 interface DashboardContentProps {
   stats: {
     totalBirds: number;
     mortalityRate: string;
+    overallDead: number;
+    todayDead: number;
+    totalEggs: number;
+    todayEggs: number;
     lowFeedAlertsCount: number;
+    lowFeedItems: Array<{ name: string; stockLevel: number; category: string }>;
+    eggTrendData: Array<{ date: string; count: number }>;
+    feedTrendData: Array<{ date: string; count: number }>;
+    revenueTrendData: Array<{ date: string; count: number }>;
     activeBatches: Array<{
       id: string;
       breed: string;
@@ -40,8 +50,28 @@ const FloatingIcon = ({ icon: Icon, className = "" }: { icon: any, className?: s
   </motion.div>
 );
 
+const MiniChart = ({ data, color }: { data: number[], color: string }) => {
+  const max = Math.max(...data, 1);
+  return (
+    <div className="flex items-end gap-1 h-12 mt-4 relative group">
+      {data.map((val, i) => (
+        <div key={i} className="flex-1 flex flex-col justify-end h-full">
+          <motion.div 
+            initial={{ height: 0 }}
+            animate={{ height: `${(val / max) * 100}%` }}
+            transition={{ duration: 1, delay: i * 0.1 }}
+            className={`w-full rounded-t-[4px] ${color} opacity-70 hover:opacity-100 transition-opacity cursor-pointer`}
+            title={`Value: ${val}`}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function DashboardContent({ stats, houses }: DashboardContentProps) {
   const { getAgeInDays } = usePoultryStats();
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const getGrowthProgress = (hatchDate: string, breed: string) => {
     const daysDiff = getAgeInDays(hatchDate);
@@ -51,7 +81,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8 relative">
+    <div className="max-w-[1600px] mx-auto space-y-8 relative pb-12">
       
       {/* Floating Decorative Icons */}
       <FloatingIcon icon={Bird} className="absolute -top-10 -left-10 w-32 h-32 pointer-events-none" />
@@ -61,144 +91,243 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
       <header className="flex items-end justify-between mb-2 px-2">
          <div>
             <h1 className="text-4xl font-black text-white tracking-tighter">Farm <span className="text-emerald-400 italic">Overview</span></h1>
-            <p className="text-white/70 font-bold uppercase tracking-widest text-[10px] mt-2 flex items-center gap-2">
+            <p className="text-white/70 font-bold uppercase tracking-widest text-[10px] mt-2 flex items-center gap-2 mb-2">
                <Activity className="w-3 h-3" /> Live Operations Tracking
             </p>
          </div>
-         <div className="flex -space-x-3">
-            {[1,2,3].map(i => (
-              <div key={i} className="w-10 h-10 rounded-full border-2 border-[#064e3b] bg-emerald-500/20 backdrop-blur-md" />
-            ))}
-            <div className="w-10 h-10 rounded-full border-2 border-[#064e3b] bg-emerald-500 font-black text-[10px] flex items-center justify-center text-white">+8</div>
+         <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-[#064e3b] px-5 py-2.5 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-emerald-400/50"
+            >
+              <Plus className="w-4 h-4" />
+              Register Batch
+            </button>
          </div>
       </header>
 
       {/* Main Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 items-start">
         
-        {/* Total Birds Hero Card - Anchor on the left */}
+        {/* Total Population Hero Card */}
         <Card interactive={true} className="md:col-span-2 lg:col-span-2 row-span-2 relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
-          <CardHeader>
+          <CardHeader className="pb-0">
             <CardTitle>Total Population</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col justify-between h-[500px]">
-            <div className="mt-8">
-               <span className="text-8xl font-black text-white tracking-tighter">{stats.totalBirds.toLocaleString()}</span>
-               <div className="text-emerald-400 font-black text-2xl mt-2 italic">Healthy Birds</div>
+          <CardContent className="flex flex-col h-full relative z-10 pt-4 pb-6">
+            <div className="mt-2">
+               <span className="text-7xl font-black text-white tracking-tighter">{stats.totalBirds.toLocaleString()}</span>
+               <div className="text-emerald-400 font-black text-xl mt-1 italic">Healthy Birds</div>
             </div>
-            <div className="flex items-center gap-3 text-emerald-400 px-4 py-2 bg-emerald-500/10 rounded-2xl w-fit mt-8 border border-emerald-500/20">
+            
+            <div className="flex items-center gap-3 text-emerald-400 px-4 py-2 bg-emerald-500/10 rounded-2xl w-fit mt-6 border border-emerald-500/20">
                <TrendingUp className="w-5 h-5" />
                <span className="text-xs font-black uppercase tracking-widest">+12% growth rate</span>
             </div>
-            <div className="absolute -bottom-10 -right-10 opacity-10">
-               <Bird className="w-80 h-80" />
+
+            {/* Mortality Sub-Panel included inside Total Population */}
+            <div className="mt-auto pt-6 w-full">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-5 backdrop-blur-md">
+                <div className="flex justify-between items-center mb-3">
+                   <div className="flex items-center gap-2">
+                     <Skull className="w-4 h-4 text-red-400" />
+                     <span className="text-red-400 font-bold text-sm">Mortality Rate</span>
+                   </div>
+                   <span className="text-white font-black text-xl">{stats.mortalityRate}%</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-2 bg-black/20 p-3 rounded-2xl">
+                   <div>
+                      <p className="text-[10px] text-white/50 uppercase font-black tracking-widest italic mb-1">Today Dead</p>
+                      <p className="text-white font-black text-2xl tracking-tighter">{stats.todayDead}</p>
+                   </div>
+                   <div>
+                      <p className="text-[10px] text-white/50 uppercase font-black tracking-widest italic mb-1">Overall Dead</p>
+                      <p className="text-white font-black text-2xl tracking-tighter">{stats.overallDead}</p>
+                   </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="absolute -top-10 -right-10 opacity-10 -z-10">
+               <Bird className="w-64 h-64" />
             </div>
           </CardContent>
         </Card>
 
-        {/* Top Row: Mortality & Feed */}
-        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-red-500/5 border-red-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-red-400">Mortality Rate</CardTitle>
-            <Skull className="w-5 h-5 text-red-400/50" />
+        {/* Top Row Right: Egg & Revenue */}
+        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-blue-500/5 border-blue-500/20 relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
+            <CardTitle className="text-blue-400">Egg Production</CardTitle>
+            <Package className="w-5 h-5 text-blue-400/50" />
           </CardHeader>
-          <CardContent>
-            <p className="text-5xl font-black text-white tracking-tighter">{stats.mortalityRate}%</p>
-            <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-3 italic">Threshold: &lt;5.0%</p>
+          <CardContent className="relative z-10">
+            <div className="flex justify-between items-end border-b border-white/5 pb-4 mb-2">
+               <div>
+                 <p className="text-4xl font-black text-white tracking-tighter">{stats.todayEggs.toLocaleString()}</p>
+                 <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">Collected Today</p>
+               </div>
+               <div className="text-right">
+                 <p className="text-2xl font-black text-white tracking-tighter">{stats.totalEggs.toLocaleString()}</p>
+                 <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">Overall Total</p>
+               </div>
+            </div>
+            <MiniChart data={stats.eggTrendData.map(d => d.count)} color="bg-blue-500" />
+            <p className="text-[8px] text-center text-white/40 uppercase tracking-widest mt-2">7 Day Trend</p>
           </CardContent>
         </Card>
 
-        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-amber-500/5 border-amber-500/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-amber-400">Feed Inventory</CardTitle>
-            <Wheat className="w-5 h-5 text-amber-400/50" />
+        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-purple-500/5 border-purple-500/20 relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
+            <CardTitle className="text-purple-400">Revenue (Cedi)</CardTitle>
+            <DollarSign className="w-5 h-5 text-purple-400/50" />
           </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-black text-white tracking-tighter">{stats.lowFeedAlertsCount} Low Stock</p>
-            <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-3">Inventory Alerts</p>
+          <CardContent className="relative z-10">
+            <p className="text-4xl font-black text-white tracking-tighter mb-1">
+              {formatCurrency(stats.revenueTrendData.reduce((acc, curr) => acc + curr.count, 0))}
+            </p>
+            <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">7 Day Sales Volume</p>
+            <MiniChart data={stats.revenueTrendData.map(d => d.count)} color="bg-purple-500" />
           </CardContent>
         </Card>
 
-        {/* Second Row: Active Batches & Register Batch */}
-        <div className="md:col-span-2 lg:col-span-2 space-y-4">
-           <div className="flex items-center justify-between px-2">
-              <h3 className="text-white/70 font-black uppercase text-[10px] tracking-widest italic">Active Batches</h3>
-              <div className="h-px flex-1 bg-white/5 mx-4" />
-           </div>
-           <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto custom-scrollbar pr-2">
-             {stats.activeBatches.map((batch) => {
-               const progress = getGrowthProgress(batch.hatchDate, batch.breed);
-               return (
-                 <div key={batch.id} className="p-5 rounded-3xl bg-white/5 border border-white/10 group/batch relative overflow-hidden hover:bg-white/[0.08] transition-all duration-300">
-                   <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                         <div className="flex items-center gap-2">
-                            <span className="text-emerald-400 font-black text-[10px] uppercase tracking-tighter bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">{batch.id}</span>
-                            <span className="text-white/40 font-bold text-[10px] uppercase tracking-widest">Hatched {new Date(batch.hatchDate).toLocaleDateString()}</span>
-                         </div>
-                         <h4 className="text-white font-black text-lg tracking-tight">{batch.breed}</h4>
-                         <div className="flex items-center gap-4 mt-2">
-                            <div className="flex flex-col">
-                               <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest">Quantity</span>
-                               <span className="text-white font-bold text-sm tracking-tight">{batch.quantity.toLocaleString()} Birds</span>
-                            </div>
-                            <div className="w-px h-6 bg-white/10" />
-                            <div className="flex flex-col">
-                               <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest">House</span>
-                               <span className="text-white font-bold text-sm tracking-tight">#{batch.houseNumber}</span>
-                            </div>
-                         </div>
-                      </div>
-                       <div className="flex items-center gap-3">
-                         <Link 
-                           href={`/dashboard/flocks/${batch.numericId}`}
-                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all opacity-0 group-hover/batch:opacity-100"
-                           title="Indept Management"
-                         >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-black uppercase tracking-tighter">Indept</span>
-                         </Link>
-                         <HealthBadge status="Healthy" />
-                       </div>
-                   </div>
-                   <div className="mt-5 space-y-2">
-                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                         <span className="text-white/70 italic">Day {progress.days} / {progress.target}</span>
-                         <span className="text-emerald-400 font-black">{Math.round(progress.percent)}%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                         <motion.div 
-                           initial={{ width: 0 }}
-                           animate={{ width: `${progress.percent}%` }}
-                           transition={{ duration: 1.5, ease: "easeOut" }}
-                           className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
-                         />
-                      </div>
-                   </div>
-                 </div>
-               );
-             })}
-           </div>
-        </div>
-
-        <Card className="md:col-span-2 lg:col-span-2 border-dashed border-emerald-500/20 bg-emerald-500/5 group/new">
-           <CardHeader className="pb-2">
-              <div className="flex items-center gap-4">
-                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover/new:rotate-12 transition-transform duration-500">
-                    <Plus className="w-5 h-5 text-emerald-400" />
-                 </div>
-                 <div>
-                    <h3 className="text-white font-black text-base tracking-tight">Register Batch</h3>
-                    <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest italic">Add to inventory</p>
-                 </div>
+        {/* Second Row: Alerts & Active Batches */}
+        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-amber-500/5 border-amber-500/20 h-[380px] flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0">
+            <CardTitle className="text-amber-400">Alerts & Reminders</CardTitle>
+            <Activity className="w-5 h-5 text-amber-400/50 flex-shrink-0" />
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto custom-scrollbar space-y-3 mt-2 pr-2">
+            {stats.lowFeedItems.map((item, idx) => (
+               <div key={`feed-${idx}`} className="flex items-center gap-3 bg-amber-500/10 p-3 rounded-2xl border border-amber-500/20">
+                  <Wheat className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                     <p className="text-white text-xs font-bold truncate">Low Stock: {item.name}</p>
+                     <p className="text-amber-500 text-[10px] uppercase tracking-widest font-black mt-0.5">{item.stockLevel} kg remaining</p>
+                  </div>
+               </div>
+            ))}
+            
+            {/* Actionable Reminders Mock Panel */}
+            <div className="flex items-center gap-3 bg-blue-500/10 p-3 rounded-2xl border border-blue-500/20">
+              <Activity className="w-5 h-5 text-blue-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                 <p className="text-white text-xs font-bold truncate">Medication Reminder</p>
+                 <p className="text-blue-400 text-[10px] uppercase tracking-widest font-black mt-0.5">Vaccine: Flock #102</p>
               </div>
-           </CardHeader>
-           <CardContent className="pb-6">
-              <RegisterBatchForm houses={houses} />
-           </CardContent>
+            </div>
+            
+            <div className="flex items-center gap-3 bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20">
+              <Package className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                 <p className="text-white text-xs font-bold truncate">Egg Collection</p>
+                 <p className="text-emerald-400 text-[10px] uppercase tracking-widest font-black mt-0.5">Evening: Due in 1 hour</p>
+              </div>
+            </div>
+            {stats.lowFeedAlertsCount === 0 && (
+              <div className="text-center py-8">
+                 <p className="text-white/40 text-xs italic font-bold">No urgent alerts.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Feed Trends Card */}
+        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-[#064e3b]/30 border-emerald-500/20 h-[380px] flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0">
+            <CardTitle className="text-emerald-400">Feed Consumption</CardTitle>
+            <Wheat className="w-5 h-5 text-emerald-400/50" />
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-between pt-2 relative z-10">
+             <div>
+                <p className="text-4xl font-black text-white tracking-tighter">
+                  {stats.feedTrendData.reduce((sum, d) => sum + d.count, 0).toLocaleString()} <span className="text-lg">kg</span>
+                </p>
+                <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">Weekly Consumption</p>
+             </div>
+             <div>
+               <MiniChart data={stats.feedTrendData.map(d => d.count)} color="bg-emerald-500" />
+               <p className="text-[8px] text-center text-white/40 uppercase tracking-widest mt-2">Daily Breakdown (Last 7 Days)</p>
+             </div>
+          </CardContent>
         </Card>
 
       </div>
+
+      {/* Active Batches List */}
+      <div className="mt-8 space-y-4">
+         <div className="flex items-center justify-between px-4">
+            <h3 className="text-white font-black text-2xl tracking-tighter">Active <span className="text-emerald-400 italic">Batches</span></h3>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent mx-6" />
+         </div>
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+           {stats.activeBatches.map((batch) => {
+             const progress = getGrowthProgress(batch.hatchDate, batch.breed);
+             return (
+               <div key={batch.id} className="p-6 rounded-[2.5rem] bg-white/5 border border-white/10 group/batch relative overflow-hidden hover:bg-white/[0.08] transition-all duration-300 shadow-2xl">
+                 <div className="flex justify-between items-start mb-6">
+                    <div className="space-y-1">
+                       <div className="flex items-center gap-2 mb-2">
+                          <span className="text-emerald-400 font-black text-[10px] uppercase tracking-tighter bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">{batch.id}</span>
+                          <span className="text-white/40 font-bold text-[10px] uppercase tracking-widest">House #{batch.houseNumber}</span>
+                       </div>
+                       <h4 className="text-white font-black text-2xl tracking-tight">{batch.breed}</h4>
+                       <div className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-1">
+                          Hatched {new Date(batch.hatchDate).toLocaleDateString()}
+                       </div>
+                    </div>
+                     <div className="flex flex-col items-end gap-3">
+                       <HealthBadge status="Healthy" />
+                     </div>
+                 </div>
+                 
+                 <div className="grid grid-cols-2 gap-4 mb-6 bg-black/20 p-4 rounded-2xl">
+                    <div className="flex flex-col">
+                       <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest mb-1">Total Quantity</span>
+                       <span className="text-white font-black text-xl tracking-tight leading-none">{batch.quantity.toLocaleString()}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                       <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest mb-1">Growth Target</span>
+                       <span className="text-white font-black text-xl tracking-tight leading-none">{progress.target} Days</span>
+                    </div>
+                 </div>
+
+                 <div className="space-y-2 mb-6">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                       <span className="text-white/70 italic">Progress (Day {progress.days})</span>
+                       <span className="text-emerald-400 font-black">{Math.round(progress.percent)}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                       <motion.div 
+                         initial={{ width: 0 }}
+                         animate={{ width: `${progress.percent}%` }}
+                         transition={{ duration: 1.5, ease: "easeOut" }}
+                         className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                       />
+                    </div>
+                 </div>
+                 
+                 <Link 
+                   href={`/dashboard/flocks/${batch.numericId}`}
+                   className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm hover:bg-emerald-500 hover:border-emerald-500 hover:text-[#064e3b] transition-all group-hover/batch:shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                 >
+                    <Eye className="w-4 h-4" />
+                    MANAGE FLOCK
+                 </Link>
+               </div>
+             );
+           })}
+         </div>
+      </div>
+
+      <Dialog 
+        isOpen={isRegisterModalOpen} 
+        onOpenChange={setIsRegisterModalOpen}
+        title="Register New Batch"
+      >
+        <div className="p-1">
+          <RegisterBatchForm houses={houses} />
+        </div>
+      </Dialog>
     </div>
   );
 }
