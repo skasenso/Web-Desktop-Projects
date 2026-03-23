@@ -7,7 +7,7 @@ import { signOut } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, Bird, Egg, ThermometerSun, 
-  Wheat, Settings, Users, XCircle, DollarSign,
+  Wheat, Settings, Users, XCircle, Banknote,
   ChevronRight, LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,7 @@ export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
     { name: 'Eggs', icon: Egg, href: '/dashboard/eggs', roles: ['OWNER', 'MANAGER'] },
     { name: 'Mortality', icon: XCircle, href: '/dashboard/mortality', roles: ['OWNER', 'MANAGER', 'WORKER'] },
     { name: 'Feeding', icon: Wheat, href: '/dashboard/feed', roles: ['OWNER', 'MANAGER', 'WORKER'] },
-    { name: 'Sales', icon: DollarSign, href: '/dashboard/sales', roles: ['OWNER', 'MANAGER'] },
+    { name: 'Sales', icon: Banknote, href: '/dashboard/sales', roles: ['OWNER', 'MANAGER'] },
     { name: 'Team', icon: Users, href: '/dashboard/team', roles: ['OWNER', 'MANAGER'] },
     { name: 'Settings', icon: Settings, href: '/dashboard/settings', roles: ['OWNER', 'MANAGER'] },
   ];
@@ -30,10 +30,10 @@ export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
 
   return (
     <aside className="fixed left-6 top-6 bottom-6 w-20 hover:w-64 group transition-all duration-500 ease-out z-50">
-      <div className="h-full glass-pill rounded-[2.5rem] flex flex-col items-stretch py-8 overflow-visible">
+      <div className="h-full glass-pill rounded-[2.5rem] flex flex-col items-stretch pt-8 pb-4 overflow-hidden">
         
         {/* Logo Section */}
-        <div className="px-6 mb-10 flex items-center">
+        <div className="px-6 mb-10 flex items-center flex-shrink-0">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0 mx-auto group-hover:mx-0">
             <Bird className="text-white w-6 h-6" />
           </div>
@@ -43,7 +43,7 @@ export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 space-y-3">
+        <nav className="flex-1 px-4 space-y-3 overflow-y-auto custom-scrollbar overflow-x-hidden">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -54,7 +54,7 @@ export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
                   "relative flex items-center h-12 rounded-2xl transition-all duration-300 group/item overflow-hidden",
                   isActive 
                     ? "bg-emerald-500/20 text-emerald-400 shadow-[inset_0_0_20px_rgba(16,185,129,0.1)] border border-emerald-500/20" 
-                    : "text-white/60 hover:text-white hover:bg-white/5"
+                    : "text-white/60 hover:text-white hover:bg-white/15"
                 )}
               >
                 <div className="w-12 h-12 flex items-center justify-center shrink-0">
@@ -72,8 +72,8 @@ export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
         </nav>
 
         {/* Footer Profile */}
-        <div className="mt-auto px-4 w-full pb-4">
-           <div className="h-px bg-white/10 mb-6 group-hover:block hidden" />
+        <div className="mt-auto px-4 w-full pb-2 flex-shrink-0">
+           <div className="h-px bg-white/20 mb-6 group-hover:block hidden" />
             <div 
               onClick={() => signOut({ callbackUrl: '/login' })}
               className="flex items-center group-hover:bg-red-500/10 rounded-2xl p-2 transition-all cursor-pointer group/logout"

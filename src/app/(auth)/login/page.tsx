@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Phone, ArrowRight, Loader2, Bird } from 'lucide-react';
+import { Phone, ArrowRight, Loader2, Bird, Plus } from 'lucide-react';
 import Background3D from '@/components/auth/Background3D';
 
 export default function LoginPage() {
@@ -27,10 +27,10 @@ export default function LoginPage() {
         redirect: false,
       });
       
-      if (res?.error) {
-        setError('No account or invitation found for this number.');
-        setIsLoading(false);
-      } else {
+        if (res?.error) {
+          setError('Number not found. New user? Click "Sign Up" below.');
+          setIsLoading(false);
+        } else {
         setSuccess(true);
         setTimeout(() => {
           router.push('/dashboard');
@@ -122,6 +122,15 @@ export default function LoginPage() {
                           <ArrowRight className="w-5 h-5 ml-2 group-hover/btn:translate-x-1 transition-transform" />
                         </>
                       )}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => router.push('/signup')}
+                      className="w-full h-14 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-2xl font-black text-lg transition-all border border-emerald-500/20 flex items-center justify-center group/signup"
+                    >
+                      <span>Create New Account</span>
+                      <Plus className="w-5 h-5 ml-2 group-hover/signup:rotate-90 transition-transform" />
                     </button>
                   </form>
                   

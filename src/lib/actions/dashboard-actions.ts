@@ -91,6 +91,11 @@ export async function getDashboardStats() {
       orderBy: { saleDate: 'asc' }
     })
 
+    const recentMortality = await tx.mortality.findMany({
+      where: { logDate: { gte: sevenDaysAgo } },
+      orderBy: { logDate: 'asc' }
+    })
+
     // Helper to format Date to YYYY-MM-DD
     const formatDate = (date: Date) => date.toISOString().split('T')[0]
 
@@ -116,6 +121,11 @@ export async function getDashboardStats() {
       return { date, count: dayTotal }
     })
 
+    const mortalityTrendData = trendDates.map(date => {
+      const dayTotal = recentMortality.filter((m: any) => formatDate(m.logDate) === date).reduce((sum: number, m: any) => sum + m.count, 0)
+      return { date, count: dayTotal }
+    })
+
     return {
       totalBirds: totalBirds._sum.currentCount || 0,
       mortalityRate: mortalityRate.toFixed(2),
@@ -128,6 +138,7 @@ export async function getDashboardStats() {
       eggTrendData,
       feedTrendData,
       revenueTrendData,
+      mortalityTrendData,
       activeBatches: activeBatches.map((batch: any) => ({
         id: `FLK-${batch.id.toString().padStart(3, '0')}`,
         numericId: batch.id,

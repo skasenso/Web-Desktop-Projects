@@ -97,8 +97,8 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Performance & Weight Tracking */}
         <div className="lg:col-span-2 space-y-8">
-          <Card className="rounded-[2.5rem] bg-white/5 border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
-             <CardHeader className="bg-white/5 border-b border-white/10 px-8 py-6 flex justify-between items-center">
+          <Card className="rounded-[2.5rem] bg-white/10 border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
+             <CardHeader className="bg-white/10 border-b border-white/10 px-8 py-6 flex justify-between items-center">
                 <CardTitle className="text-white italic font-black flex items-center gap-3">
                    <Weight className="w-5 h-5 text-emerald-400" /> Growth & Weight History
                 </CardTitle>
@@ -149,9 +149,9 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
                                 <motion.div 
                                   initial={{ height: 0 }}
                                   animate={{ height: `${height}%` }}
-                                  className="w-full bg-gradient-to-t from-emerald-600/50 to-emerald-400 rounded-t-xl group-hover:from-emerald-500 group-hover:to-emerald-300 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                                  className="w-full bg-gradient-to-t from-emerald-600/50 to-emerald-400 rounded-t-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                                 />
-                                <span className="absolute -top-10 scale-0 group-hover:scale-100 transition-transform bg-white/10 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] text-white whitespace-nowrap z-10">
+                                <span className="absolute -top-10 scale-0 group-hover:scale-100 transition-transform bg-white/20 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] text-white whitespace-nowrap z-10">
                                    {rec.averageWeight} kg
                                 </span>
                                 <span className="text-[9px] text-white/30 font-bold mt-2 uppercase">
@@ -161,7 +161,7 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
                            )
                         })}
                      </div>
-                     <div className="flex justify-between items-center bg-white/5 p-5 rounded-3xl border border-white/5 italic">
+                     <div className="flex justify-between items-center bg-white/10 p-5 rounded-3xl border border-white/5 italic">
                         <div className="flex items-center gap-4">
                            <Info className="w-4 h-4 text-emerald-400" />
                            <span className="text-white/60 text-xs font-bold leading-relaxed">
@@ -172,7 +172,7 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
                      </div>
                   </div>
                 ) : (
-                  <div className="py-20 text-center bg-white/5 rounded-3xl border-2 border-dashed border-white/5">
+                  <div className="py-20 text-center bg-white/10 rounded-3xl border-2 border-dashed border-white/5">
                      <Weight className="w-12 h-12 text-white/10 mx-auto mb-4" />
                      <p className="text-white/40 font-bold uppercase tracking-widest text-[10px] italic">No weight records found yet.</p>
                   </div>
@@ -181,15 +181,15 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
           </Card>
 
           {/* Activity Logs */}
-          <Card className="rounded-[2.5rem] bg-white/5 border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
-              <CardHeader className="bg-white/5 border-b border-white/10 px-8 py-6">
+          <Card className="rounded-[2.5rem] bg-white/10 border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
+              <CardHeader className="bg-white/10 border-b border-white/10 px-8 py-6">
                 <CardTitle className="text-white italic font-black flex items-center gap-3">
                    <Clock className="w-5 h-5 text-blue-400" /> Activity Timeline
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-8">
                  <div className="relative space-y-0 translate-x-3">
-                    <div className="absolute left-0 top-0 bottom-0 w-px bg-white/10" />
+                    <div className="absolute left-0 top-0 bottom-0 w-px bg-white/20" />
                     
                     {/* Combine logs and sort by date */}
                     {[
@@ -202,7 +202,7 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
                     .slice(0, 15)
                     .map((item, idx) => (
                       <div key={idx} className="relative pb-8 pl-10 group">
-                         <div className="absolute left-0 top-0 w-2.5 h-2.5 -translate-x-1/2 rounded-full border-2 border-slate-900 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] group-hover:scale-125 transition-transform" />
+                         <div className="absolute left-0 top-0 w-2.5 h-2.5 -translate-x-1/2 rounded-full border-2 border-slate-900 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-transform" />
                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
                                <p className="text-white/40 text-[9px] font-black uppercase tracking-widest mb-1 italic">
@@ -220,7 +220,12 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
                                   </span>
                                   <span className="text-white font-black tracking-tight text-sm">
                                      {item.type === 'FEED' && `Logged ${item.amountConsumed}kg consumption`}
-                                     {item.type === 'MORTALITY' && `Recorded ${item.count} deaths`}
+                                     {item.type === 'MORTALITY' && (
+                                       <div className="flex flex-col">
+                                          <span>Recorded {item.count} deaths</span>
+                                          <span className="text-[10px] text-white/50">{item.category} › {item.subCategory}</span>
+                                       </div>
+                                     )}
                                      {item.type === 'EGGS' && `Collected ${item.eggsCollected} eggs`}
                                      {item.type === 'WEIGHT' && `Average weight: ${item.averageWeight}kg`}
                                   </span>
@@ -251,7 +256,7 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
               </Button>
            </Card>
 
-           <Card className="rounded-[2.5rem] bg-white/5 border-white/10 backdrop-blur-xl p-8 shadow-2xl border-dashed">
+           <Card className="rounded-[2.5rem] bg-white/10 border-white/10 backdrop-blur-xl p-8 shadow-2xl border-dashed">
               <h4 className="text-white/60 font-black italic uppercase text-[10px] tracking-widest mb-6 border-b border-white/5 pb-2">Batch Metadata</h4>
               <div className="space-y-6">
                  <MetaItem label="Batch ID" value={`FLK-${batch.id.toString().padStart(3, '0')}`} />
@@ -268,7 +273,7 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
 
 const MetricCard = ({ title, value, icon: Icon, color, subtext }: any) => {
   const colors: any = {
-    emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20 icon-emerald",
+    emerald: "text-emerald-400 bg-emerald-500/20 border-emerald-500/20 icon-emerald",
     amber: "text-amber-400 bg-amber-500/10 border-amber-500/20 icon-amber",
     red: "text-red-500 bg-red-500/10 border-red-500/20 icon-red",
     blue: "text-blue-400 bg-blue-500/10 border-blue-500/20 icon-blue",
@@ -277,7 +282,7 @@ const MetricCard = ({ title, value, icon: Icon, color, subtext }: any) => {
   return (
     <div className="relative group">
        <div className={cn(
-         "p-6 rounded-[2rem] bg-white/5 border-white/10 border backdrop-blur-md shadow-2xl flex flex-col justify-between h-40 group-hover:bg-white/[0.08] transition-all duration-500 relative overflow-hidden",
+         "p-6 rounded-[2rem] bg-white/10 border-white/10 border backdrop-blur-md shadow-2xl flex flex-col justify-between h-40 group-hover:bg-white/[0.08] transition-all duration-500 relative overflow-hidden",
          "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 group-hover:before:opacity-[0.03] transition-opacity",
          color === 'emerald' && "before:from-emerald-300 before:to-emerald-600",
          color === 'amber' && "before:from-amber-300 before:to-amber-600",
@@ -303,7 +308,7 @@ const MetricCard = ({ title, value, icon: Icon, color, subtext }: any) => {
 
 const HealthItem = ({ label, value, color }: any) => (
   <div className="flex justify-between items-center group/item cursor-pointer">
-     <span className="text-white/40 text-[10px] font-black uppercase tracking-widest group-hover/item:text-white/60 transition-colors uppercase italic">{label}</span>
+     <span className="text-white/40 text-[10px] font-black uppercase tracking-widest transition-colors uppercase italic">{label}</span>
      <span className={cn(
        "text-xs font-black tracking-widest uppercase",
        color === 'emerald' ? 'text-emerald-400' : 

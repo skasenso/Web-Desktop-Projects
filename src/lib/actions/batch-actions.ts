@@ -79,6 +79,8 @@ export async function deleteBatch(id: number) {
 export async function logMortality(data: {
   batchId: number
   count: number
+  category: string
+  subCategory: string
   reason?: string
   logDate: string
 }) {
@@ -88,6 +90,8 @@ export async function logMortality(data: {
       data: {
         batchId: data.batchId,
         count: data.count,
+        category: data.category,
+        subCategory: data.subCategory,
         reason: data.reason,
         logDate: new Date(data.logDate),
         userId: userId

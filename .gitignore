@@ -42,3 +42,6 @@ next-env.d.ts
 
 # secrets
 client_secret_*.json
+
+# build artifacts
+/midsem_exam/

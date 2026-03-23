@@ -71,8 +71,11 @@ export default async function MortalityPage() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-black italic text-lg">
                   {log.count}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500 font-medium italic">
-                  {log.reason || 'Not specified'}
+                <td className="px-6 py-4 text-sm text-gray-500 font-medium">
+                  <div className="flex flex-col">
+                    <span className="text-gray-900 font-bold italic">{log.category} › {log.subCategory}</span>
+                    {log.reason && <span className="text-[10px] text-gray-400 mt-1">{log.reason}</span>}
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-right">
                   <Link 

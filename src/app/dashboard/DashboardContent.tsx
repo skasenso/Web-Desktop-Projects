@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { RegisterBatchForm } from '@/components/forms/RegisterBatchForm';
 import { usePoultryStats } from '@/hooks/usePoultryStats';
 import { motion } from 'framer-motion';
-import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package, Eye, DollarSign } from 'lucide-react';
+import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package, Eye, Banknote } from 'lucide-react';
 import Link from 'next/link';
 import { Dialog } from '@/components/ui/Dialog';
 import { formatCurrency } from '@/lib/utils';
@@ -24,6 +24,7 @@ interface DashboardContentProps {
     eggTrendData: Array<{ date: string; count: number }>;
     feedTrendData: Array<{ date: string; count: number }>;
     revenueTrendData: Array<{ date: string; count: number }>;
+    mortalityTrendData: Array<{ date: string; count: number }>;
     activeBatches: Array<{
       id: string;
       breed: string;
@@ -50,24 +51,59 @@ const FloatingIcon = ({ icon: Icon, className = "" }: { icon: any, className?: s
   </motion.div>
 );
 
-const MiniChart = ({ data, color }: { data: number[], color: string }) => {
+const MiniLineChart = ({ data, color }: { data: number[], color: string }) => {
+  if (!data || data.length === 0) return null;
   const max = Math.max(...data, 1);
+  const points = data.map((val, i) => ({
+    x: i * (100 / (data.length - 1 || 1)),
+    y: 100 - (val / max) * 100
+  }));
+
+  const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const areaData = `${pathData} L 100 100 L 0 100 Z`;
+
   return (
-    <div className="flex items-end gap-1 h-12 mt-4 relative group">
-      {data.map((val, i) => (
-        <div key={i} className="flex-1 flex flex-col justify-end h-full">
-          <motion.div 
-            initial={{ height: 0 }}
-            animate={{ height: `${(val / max) * 100}%` }}
-            transition={{ duration: 1, delay: i * 0.1 }}
-            className={`w-full rounded-t-[4px] ${color} opacity-70 hover:opacity-100 transition-opacity cursor-pointer`}
-            title={`Value: ${val}`}
+    <div className="flex-1 h-12 mt-4 relative group">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+        {/* Fill Area */}
+        <motion.path
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.2 }}
+          d={areaData}
+          fill="currentColor"
+          className={color.replace('bg-', 'text-')}
+        />
+        {/* Line */}
+        <motion.path
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 1.5, ease: "easeInOut" }}
+          d={pathData}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={color.replace('bg-', 'text-')}
+        />
+        {/* Points */}
+        {points.map((p, i) => (
+          <motion.circle
+            key={i}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: i * 0.1 }}
+            cx={p.x}
+            cy={p.y}
+            r="3"
+            fill="white"
+            className="shadow-xl"
           />
-        </div>
-      ))}
+        ))}
+      </svg>
     </div>
-  )
-}
+  );
+};
 
 export function DashboardContent({ stats, houses }: DashboardContentProps) {
   const { getAgeInDays } = usePoultryStats();
@@ -98,7 +134,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
          <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsRegisterModalOpen(true)}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-[#064e3b] px-5 py-2.5 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-emerald-400/50"
+              className="flex items-center gap-2 bg-emerald-500 text-[#064e3b] px-5 py-2.5 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] border border-emerald-400/50"
             >
               <Plus className="w-4 h-4" />
               Register Batch
@@ -110,7 +146,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
       <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 items-start">
         
         {/* Total Population Hero Card */}
-        <Card interactive={true} className="md:col-span-2 lg:col-span-2 row-span-2 relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
+        <Card className="md:col-span-2 lg:col-span-2 row-span-2 relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
           <CardHeader className="pb-0">
             <CardTitle>Total Population</CardTitle>
           </CardHeader>
@@ -120,7 +156,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                <div className="text-emerald-400 font-black text-xl mt-1 italic">Healthy Birds</div>
             </div>
             
-            <div className="flex items-center gap-3 text-emerald-400 px-4 py-2 bg-emerald-500/10 rounded-2xl w-fit mt-6 border border-emerald-500/20">
+            <div className="flex items-center gap-3 text-emerald-400 px-4 py-2 bg-emerald-500/20 rounded-2xl w-fit mt-6 border border-emerald-500/20">
                <TrendingUp className="w-5 h-5" />
                <span className="text-xs font-black uppercase tracking-widest">+12% growth rate</span>
             </div>
@@ -135,16 +171,20 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                    </div>
                    <span className="text-white font-black text-xl">{stats.mortalityRate}%</span>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mt-2 bg-black/20 p-3 rounded-2xl">
-                   <div>
-                      <p className="text-[10px] text-white/50 uppercase font-black tracking-widest italic mb-1">Today Dead</p>
-                      <p className="text-white font-black text-2xl tracking-tighter">{stats.todayDead}</p>
-                   </div>
-                   <div>
-                      <p className="text-[10px] text-white/50 uppercase font-black tracking-widest italic mb-1">Overall Dead</p>
-                      <p className="text-white font-black text-2xl tracking-tighter">{stats.overallDead}</p>
-                   </div>
-                </div>
+                 <div className="grid grid-cols-2 gap-4 mt-2 bg-black/40 p-3 rounded-2xl">
+                    <div>
+                       <p className="text-[10px] text-white/50 uppercase font-black tracking-widest italic mb-1">Today Dead</p>
+                       <p className="text-white font-black text-2xl tracking-tighter">{stats.todayDead}</p>
+                    </div>
+                    <div>
+                       <p className="text-[10px] text-white/50 uppercase font-black tracking-widest italic mb-1">Overall Dead</p>
+                       <p className="text-white font-black text-2xl tracking-tighter">{stats.overallDead}</p>
+                    </div>
+                 </div>
+                 <div className="mt-4 pt-4 border-t border-white/5">
+                    <MiniLineChart data={stats.mortalityTrendData.map(d => d.count)} color="bg-red-400" />
+                    <p className="text-[8px] text-center text-red-400/50 uppercase tracking-widest mt-2 font-black">7 Day Mortality Trend</p>
+                 </div>
               </div>
             </div>
             
@@ -155,7 +195,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
         </Card>
 
         {/* Top Row Right: Egg & Revenue */}
-        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-blue-500/5 border-blue-500/20 relative overflow-hidden">
+        <Card className="md:col-span-2 lg:col-span-2 bg-blue-500/15 border-blue-500/20 relative overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
             <CardTitle className="text-blue-400">Egg Production</CardTitle>
             <Package className="w-5 h-5 text-blue-400/50" />
@@ -171,27 +211,27 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                  <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">Overall Total</p>
                </div>
             </div>
-            <MiniChart data={stats.eggTrendData.map(d => d.count)} color="bg-blue-500" />
+            <MiniLineChart data={stats.eggTrendData.map(d => d.count)} color="bg-blue-500" />
             <p className="text-[8px] text-center text-white/40 uppercase tracking-widest mt-2">7 Day Trend</p>
           </CardContent>
         </Card>
 
-        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-purple-500/5 border-purple-500/20 relative overflow-hidden">
+        <Card className="md:col-span-2 lg:col-span-2 bg-purple-500/15 border-purple-500/20 relative overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
             <CardTitle className="text-purple-400">Revenue (Cedi)</CardTitle>
-            <DollarSign className="w-5 h-5 text-purple-400/50" />
+            <Banknote className="w-5 h-5 text-purple-400/50" />
           </CardHeader>
           <CardContent className="relative z-10">
             <p className="text-4xl font-black text-white tracking-tighter mb-1">
               {formatCurrency(stats.revenueTrendData.reduce((acc, curr) => acc + curr.count, 0))}
             </p>
             <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">7 Day Sales Volume</p>
-            <MiniChart data={stats.revenueTrendData.map(d => d.count)} color="bg-purple-500" />
+            <MiniLineChart data={stats.revenueTrendData.map(d => d.count)} color="bg-purple-500" />
           </CardContent>
         </Card>
 
         {/* Second Row: Alerts & Active Batches */}
-        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-amber-500/5 border-amber-500/20 h-[380px] flex flex-col">
+        <Card className="md:col-span-2 lg:col-span-2 bg-amber-500/15 border-amber-500/20 h-[380px] flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0">
             <CardTitle className="text-amber-400">Alerts & Reminders</CardTitle>
             <Activity className="w-5 h-5 text-amber-400/50 flex-shrink-0" />
@@ -216,7 +256,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
               </div>
             </div>
             
-            <div className="flex items-center gap-3 bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20">
+            <div className="flex items-center gap-3 bg-emerald-500/20 p-3 rounded-2xl border border-emerald-500/20">
               <Package className="w-5 h-5 text-emerald-400 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                  <p className="text-white text-xs font-bold truncate">Egg Collection</p>
@@ -232,7 +272,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
         </Card>
 
         {/* Feed Trends Card */}
-        <Card interactive={true} className="md:col-span-2 lg:col-span-2 bg-[#064e3b]/30 border-emerald-500/20 h-[380px] flex flex-col">
+        <Card className="md:col-span-2 lg:col-span-2 bg-[#064e3b]/30 border-emerald-500/20 h-[380px] flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0">
             <CardTitle className="text-emerald-400">Feed Consumption</CardTitle>
             <Wheat className="w-5 h-5 text-emerald-400/50" />
@@ -245,7 +285,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                 <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">Weekly Consumption</p>
              </div>
              <div>
-               <MiniChart data={stats.feedTrendData.map(d => d.count)} color="bg-emerald-500" />
+               <MiniLineChart data={stats.feedTrendData.map(d => d.count)} color="bg-emerald-500" />
                <p className="text-[8px] text-center text-white/40 uppercase tracking-widest mt-2">Daily Breakdown (Last 7 Days)</p>
              </div>
           </CardContent>
@@ -263,11 +303,11 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
            {stats.activeBatches.map((batch) => {
              const progress = getGrowthProgress(batch.hatchDate, batch.breed);
              return (
-               <div key={batch.id} className="p-6 rounded-[2.5rem] bg-white/5 border border-white/10 group/batch relative overflow-hidden hover:bg-white/[0.08] transition-all duration-300 shadow-2xl">
+               <div key={batch.id} className="p-6 rounded-[2.5rem] bg-white/15 border border-white/10 group/batch relative overflow-hidden transition-all duration-300 shadow-2xl">
                  <div className="flex justify-between items-start mb-6">
                     <div className="space-y-1">
                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-emerald-400 font-black text-[10px] uppercase tracking-tighter bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">{batch.id}</span>
+                          <span className="text-emerald-400 font-black text-[10px] uppercase tracking-tighter bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/20">{batch.id}</span>
                           <span className="text-white/40 font-bold text-[10px] uppercase tracking-widest">House #{batch.houseNumber}</span>
                        </div>
                        <h4 className="text-white font-black text-2xl tracking-tight">{batch.breed}</h4>
@@ -280,7 +320,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                      </div>
                  </div>
                  
-                 <div className="grid grid-cols-2 gap-4 mb-6 bg-black/20 p-4 rounded-2xl">
+                 <div className="grid grid-cols-2 gap-4 mb-6 bg-black/40 p-4 rounded-2xl">
                     <div className="flex flex-col">
                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest mb-1">Total Quantity</span>
                        <span className="text-white font-black text-xl tracking-tight leading-none">{batch.quantity.toLocaleString()}</span>
@@ -308,7 +348,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                  
                  <Link 
                    href={`/dashboard/flocks/${batch.numericId}`}
-                   className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm hover:bg-emerald-500 hover:border-emerald-500 hover:text-[#064e3b] transition-all group-hover/batch:shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                   className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-sm transition-all"
                  >
                     <Eye className="w-4 h-4" />
                     MANAGE FLOCK

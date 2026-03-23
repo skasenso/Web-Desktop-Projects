@@ -1,7 +1,7 @@
 import React from 'react';
 import { getAllSales } from '@/lib/actions/dashboard-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { DollarSign, ShoppingBag, TrendingUp, Users } from 'lucide-react';
+import { Banknote, ShoppingBag, TrendingUp, Users } from 'lucide-react';
 import { SaleActionsHeader, SaleRowActions } from './SaleActions';
 import { formatDate, formatCurrency } from '@/lib/utils';
 
@@ -24,7 +24,7 @@ export default async function SalesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="rounded-2xl border-none shadow-xl shadow-gray-200/50 bg-green-900 text-white p-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-10">
-            <DollarSign className="w-24 h-24" />
+            <Banknote className="w-24 h-24" />
           </div>
           <p className="text-green-300 text-sm font-bold uppercase tracking-widest mb-1">Total Revenue</p>
           <h3 className="text-4xl font-black">{formatCurrency(totalRevenue)}</h3>
@@ -67,7 +67,7 @@ export default async function SalesPage() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {sales.map((sale: any) => (
-              <tr key={sale.id} className="hover:bg-gray-50/50 transition-colors">
+              <tr key={sale.id} className="transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                   {formatDate(sale.saleDate)}
                 </td>

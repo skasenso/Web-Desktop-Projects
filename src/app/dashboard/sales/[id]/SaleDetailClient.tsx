@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { 
-  DollarSign, 
+  Banknote, 
   Receipt, 
   ShoppingBag, 
   ChevronRight,
@@ -30,7 +30,7 @@ export const SaleDetailClient = ({ sale }: SaleDetailClientProps) => {
         <MetricCard 
           title="Total Amount" 
           value={formatCurrency(sale.totalAmount)} 
-          icon={DollarSign} 
+          icon={Banknote} 
           color="emerald" 
           subtext="Processed Order"
         />
@@ -53,8 +53,8 @@ export const SaleDetailClient = ({ sale }: SaleDetailClientProps) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Items Breakdown */}
         <div className="lg:col-span-2 space-y-8">
-          <Card className="rounded-[2.5rem] bg-white/5 border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
-              <CardHeader className="bg-white/5 border-b border-white/10 px-8 py-6">
+          <Card className="rounded-[2.5rem] bg-white/10 border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
+              <CardHeader className="bg-white/10 border-b border-white/10 px-8 py-6">
                 <CardTitle className="text-white italic font-black flex items-center gap-3">
                    <Receipt className="w-5 h-5 text-emerald-400" /> Itemized Invoice
                 </CardTitle>
@@ -62,7 +62,7 @@ export const SaleDetailClient = ({ sale }: SaleDetailClientProps) => {
               <CardContent className="p-0">
                  <table className="w-full text-left">
                     <thead>
-                       <tr className="bg-white/5 border-b border-white/10">
+                       <tr className="bg-white/10 border-b border-white/10">
                           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-white/40 italic">Description</th>
                           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-white/40 italic text-center">Qty</th>
                           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-white/40 italic text-right">Unit Price</th>
@@ -94,7 +94,7 @@ export const SaleDetailClient = ({ sale }: SaleDetailClientProps) => {
 
         {/* Sidebar Info */}
         <div className="space-y-8">
-           <Card className="rounded-[2.5rem] bg-white/5 border-white/10 backdrop-blur-xl p-8 relative overflow-hidden shadow-2xl">
+           <Card className="rounded-[2.5rem] bg-white/10 border-white/10 backdrop-blur-xl p-8 relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 right-0 p-8 opacity-[0.03] rotate-12 pointer-events-none">
                  <User className="w-56 h-56 text-emerald-400" />
               </div>
@@ -108,7 +108,7 @@ export const SaleDetailClient = ({ sale }: SaleDetailClientProps) => {
 
            <Link 
              href="/dashboard/sales"
-             className="flex items-center justify-center gap-3 w-full py-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[1.5rem] text-white/40 hover:text-white transition-all group"
+             className="flex items-center justify-center gap-3 w-full py-6 bg-white/10 hover:bg-white/20 border border-white/10 rounded-[1.5rem] text-white/40 hover:text-white transition-all group"
            >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
               <span className="text-[10px] font-black uppercase tracking-widest">Back to Ledger</span>
@@ -128,7 +128,7 @@ const MetricCard = ({ title, value, icon: Icon, color, subtext }: any) => {
   };
 
   return (
-    <div className="p-6 rounded-[2rem] bg-white/5 border-white/10 border backdrop-blur-md shadow-2xl flex flex-col justify-between h-40 hover:bg-white/[0.08] transition-all duration-500 group">
+    <div className="p-6 rounded-[2rem] bg-white/10 border-white/10 border backdrop-blur-md shadow-2xl flex flex-col justify-between h-40 transition-all duration-500 group">
        <div className="flex justify-between items-start">
           <div className={`p-3 rounded-2xl border ${colors[color]}`}>
              <Icon className="w-5 h-5" />
