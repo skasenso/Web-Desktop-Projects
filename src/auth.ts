@@ -31,7 +31,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
 
         if (user) {
-          return user; 
+          // Fetch active farm
+          const membership = await prisma.farmMember.findFirst({
+            where: { userId: user.id }
+          });
+          
+          return {
+            ...user,
+            activeFarmId: membership?.farmId
+          } as any; 
         }
 
         // 2. Check invitations if user not found natively
@@ -63,7 +71,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
              data: { status: 'ACCEPTED' }
            });
 
-           return user;
+           return {
+             ...user,
+             activeFarmId: invitation.farmId
+           } as any;
         }
 
         // Failed Auth Context

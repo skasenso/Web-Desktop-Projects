@@ -2,34 +2,31 @@
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
+import { getAuthContext } from '@/lib/auth-utils'
 import { redirect } from 'next/navigation'
 
-// We'll replace MOCK_USER_ID with real IDs from the session
-async function getUserId() {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  return session.user.id
-}
-
-
 export async function getDashboardStats() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const totalBirds = await tx.batch.aggregate({
-      where: { status: 'active' },
+      where: { status: 'active', farmId: activeFarmId },
       _sum: { currentCount: true }
     })
 
     const eggsData = await tx.eggProduction.aggregate({
+      where: { farmId: activeFarmId },
       _sum: { eggsCollected: true }
     })
 
     const mortalityData = await tx.mortality.aggregate({
+      where: { farmId: activeFarmId },
       _sum: { count: true }
     })
 
     const totalInitialBirds = await tx.batch.aggregate({
+      where: { farmId: activeFarmId },
       _sum: { initialCount: true }
     })
 
@@ -40,6 +37,7 @@ export async function getDashboardStats() {
     const lowFeedThreshold = 500 // kg
     const lowFeedAlerts = await tx.inventory.findMany({
       where: {
+        farmId: activeFarmId,
         category: 'feed',
         stockLevel: {
           lt: lowFeedThreshold
@@ -48,7 +46,7 @@ export async function getDashboardStats() {
     })
 
     const activeBatches = await tx.batch.findMany({
-      where: { status: 'active' },
+      where: { status: 'active', farmId: activeFarmId },
       include: {
         house: true,
         eggProduction: {
@@ -66,33 +64,33 @@ export async function getDashboardStats() {
     sevenDaysAgo.setHours(0, 0, 0, 0)
 
     const todayMortality = await tx.mortality.aggregate({
-      where: { logDate: { gte: today } },
+      where: { logDate: { gte: today }, farmId: activeFarmId },
       _sum: { count: true }
     })
 
     const todayEggs = await tx.eggProduction.aggregate({
-      where: { logDate: { gte: today } },
+      where: { logDate: { gte: today }, farmId: activeFarmId },
       _sum: { eggsCollected: true }
     })
 
     // Fetch raw data for last 7 days for trends
     const recentEggs = await tx.eggProduction.findMany({
-      where: { logDate: { gte: sevenDaysAgo } },
+      where: { logDate: { gte: sevenDaysAgo }, farmId: activeFarmId },
       orderBy: { logDate: 'asc' }
     })
     
     const recentFeed = await tx.feedingLog.findMany({
-      where: { logDate: { gte: sevenDaysAgo } },
+      where: { logDate: { gte: sevenDaysAgo }, farmId: activeFarmId },
       orderBy: { logDate: 'asc' }
     })
 
     const recentSales = await tx.sale.findMany({
-      where: { saleDate: { gte: sevenDaysAgo } },
+      where: { saleDate: { gte: sevenDaysAgo }, farmId: activeFarmId },
       orderBy: { saleDate: 'asc' }
     })
 
     const recentMortality = await tx.mortality.findMany({
-      where: { logDate: { gte: sevenDaysAgo } },
+      where: { logDate: { gte: sevenDaysAgo }, farmId: activeFarmId },
       orderBy: { logDate: 'asc' }
     })
 
@@ -162,11 +160,14 @@ export async function createBatch(data: {
   initialCount: number
   arrivalDate: string
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const batch = await tx.batch.create({
       data: {
         houseId: data.houseId,
+        farmId: activeFarmId,
         breedType: data.breedType,
         initialCount: data.initialCount,
         currentCount: data.initialCount,
@@ -189,18 +190,22 @@ export async function logFeeding(data: {
   feedTypeId: number
   amountConsumed: number
 }) {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
   try {
-    const result = await prisma.$transaction(async (tx: any) => {
+    const result = await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
       const log = await tx.feedingLog.create({
         data: {
           batchId: data.batchId,
+          farmId: activeFarmId,
           feedTypeId: data.feedTypeId,
           amountConsumed: data.amountConsumed
         }
       })
 
       await tx.inventory.update({
-        where: { id: data.feedTypeId },
+        where: { id: data.feedTypeId, farmId: activeFarmId },
         data: {
           stockLevel: {
             decrement: data.amountConsumed
@@ -219,9 +224,13 @@ export async function logFeeding(data: {
 }
 
 export async function getHouses() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
-    return await tx.house.findMany()
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
+    return await tx.house.findMany({
+      where: { farmId: activeFarmId }
+    })
   }).catch((error: any) => {
     console.error('Error fetching houses:', error)
     return []
@@ -229,9 +238,12 @@ export async function getHouses() {
 }
 
 export async function getAllBatches() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const batches = await tx.batch.findMany({
+      where: { farmId: activeFarmId },
       include: {
         house: true,
       },
@@ -255,10 +267,12 @@ export async function getAllBatches() {
 
 
 export async function updateBatchStatus(id: number, status: string) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const batch = await tx.batch.update({
-      where: { id },
+      where: { id, farmId: activeFarmId },
       data: { status },
     })
     revalidatePath('/dashboard/flocks')
@@ -277,13 +291,16 @@ export async function logProduction(data: {
   birdWeight?: number
   mortalityCount: number
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     // Log eggs if collected
     if (data.eggsCollected > 0 || data.damagedEggs > 0) {
       await tx.eggProduction.create({
         data: {
           batchId: data.batchId,
+          farmId: activeFarmId,
           eggsCollected: data.eggsCollected,
           damagedEggs: data.damagedEggs,
           logDate: new Date(),
@@ -297,6 +314,7 @@ export async function logProduction(data: {
       await tx.mortality.create({
         data: {
           batchId: data.batchId,
+          farmId: activeFarmId,
           count: data.mortalityCount,
           logDate: new Date(),
           userId: userId
@@ -305,7 +323,7 @@ export async function logProduction(data: {
 
       // Update current count in batch
       await tx.batch.update({
-        where: { id: data.batchId },
+        where: { id: data.batchId, farmId: activeFarmId },
         data: {
           currentCount: {
             decrement: data.mortalityCount
@@ -324,13 +342,12 @@ export async function logProduction(data: {
 }
 
 export async function updateFarmInfo(data: { name: string, location?: string, capacity: number }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
-    const farm = await tx.farm.findFirst({ where: { userId } })
-    if (!farm) throw new Error('Farm not found')
-    
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const updatedFarm = await tx.farm.update({
-      where: { id: farm.id },
+      where: { id: activeFarmId },
       data: {
         name: data.name,
         location: data.location,
@@ -346,16 +363,15 @@ export async function updateFarmInfo(data: { name: string, location?: string, ca
 }
 
 export async function createHouse(data: { houseNumber: string, capacity: number }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
-    const farm = await tx.farm.findFirst({ where: { userId } })
-    if (!farm) throw new Error('Farm not found')
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
 
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const house = await tx.house.create({
       data: {
         name: data.houseNumber,
         capacity: data.capacity,
-        farmId: farm.id,
+        farmId: activeFarmId,
         userId: userId
       }
     })
@@ -369,18 +385,32 @@ export async function createHouse(data: { houseNumber: string, capacity: number 
 }
 
 export async function onboardFarmer(data: { name: string, location: string, capacity: number }) {
-  const userId = await getUserId()
+  const { userId } = await getAuthContext()
   try {
-    const farm = await prisma.farm.create({
-      data: {
-        name: data.name,
-        location: data.location,
-        capacity: data.capacity,
-        userId: userId
-      }
+    const result = await prisma.$transaction(async (tx) => {
+      const farm = await tx.farm.create({
+        data: {
+          name: data.name,
+          location: data.location,
+          capacity: data.capacity,
+          userId: userId
+        }
+      })
+
+      // Assign the user as OWNER of this farm
+      await tx.farmMember.create({
+        data: {
+          farmId: farm.id,
+          userId: userId,
+          role: 'OWNER'
+        }
+      })
+
+      return farm
     })
+
     revalidatePath('/dashboard')
-    return { success: true, farm }
+    return { success: true, farm: result }
   } catch (error) {
     console.error('Error onboarding farmer:', error)
     return { success: false, error: 'Failed to onboard farmer' }
@@ -388,21 +418,24 @@ export async function onboardFarmer(data: { name: string, location: string, capa
 }
 
 export async function checkOnboardingStatus() {
-  const session = await auth()
-  if (!session?.user?.id) return { isOnboarded: false, error: 'Unauthorized' }
+  const { userId } = await getAuthContext()
+  if (!userId) return { isOnboarded: false, error: 'Unauthorized' }
   
-  const farm = await prisma.farm.findFirst({
-    where: { userId: session.user.id }
+  const membership = await prisma.farmMember.findFirst({
+    where: { userId: userId }
   })
   
-  return { isOnboarded: !!farm }
+  return { isOnboarded: !!membership }
 }
 
 
 export async function getAllEggProduction() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     return await tx.eggProduction.findMany({
+      where: { farmId: activeFarmId },
       include: {
         batch: true,
       },
@@ -418,9 +451,12 @@ export async function getAllEggProduction() {
 }
 
 export async function getAllFeedingLogs() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const logs = await tx.feedingLog.findMany({
+      where: { farmId: activeFarmId },
       include: {
         batch: true,
         inventory: true,
@@ -445,9 +481,12 @@ export async function getAllFeedingLogs() {
 }
 
 export async function getAllInventory() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const items = await tx.inventory.findMany({
+      where: { farmId: activeFarmId },
       orderBy: {
         itemName: 'asc',
       },
@@ -463,9 +502,12 @@ export async function getAllInventory() {
 }
 
 export async function getAllSales() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const sales = await tx.sale.findMany({
+      where: { farmId: activeFarmId },
       include: {
         items: true,
       },
@@ -490,9 +532,12 @@ export async function getAllSales() {
 }
 
 export async function getAllMortalityLogs() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     return await tx.mortality.findMany({
+      where: { farmId: activeFarmId },
       include: {
         batch: true,
       },
@@ -508,10 +553,12 @@ export async function getAllMortalityLogs() {
 }
 
 export async function getBatchDetails(id: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return null
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const batch = await tx.batch.findUnique({
-      where: { id },
+      where: { id, farmId: activeFarmId },
       include: {
         house: true,
         feedingLogs: {
@@ -564,11 +611,14 @@ export async function logWeight(data: {
   averageWeight: number
   logDate: string
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const record = await tx.weightRecord.create({
       data: {
         batchId: data.batchId,
+        farmId: activeFarmId,
         averageWeight: data.averageWeight,
         logDate: new Date(data.logDate),
         userId: userId
@@ -583,10 +633,12 @@ export async function logWeight(data: {
 }
 
 export async function getInventoryDetails(id: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return null
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const item = await tx.inventory.findUnique({
-      where: { id },
+      where: { id, farmId: activeFarmId },
       include: {
         feedingLogs: {
           include: { batch: true },
@@ -612,10 +664,12 @@ export async function getInventoryDetails(id: number) {
 }
 
 export async function getSaleDetails(id: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return null
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const sale = await tx.sale.findUnique({
-      where: { id },
+      where: { id, farmId: activeFarmId },
       include: {
         items: true
       }
@@ -639,9 +693,12 @@ export async function getSaleDetails(id: number) {
 }
 
 export async function getGlobalFlockStats() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const batches = await tx.batch.findMany({
+      where: { farmId: activeFarmId },
       include: {
         mortalityRecords: true,
         feedingLogs: true,
@@ -669,9 +726,12 @@ export async function getGlobalFlockStats() {
 }
 
 export async function getGlobalEggStats() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const logs = await tx.eggProduction.findMany({
+      where: { farmId: activeFarmId },
       include: { batch: true },
       orderBy: { logDate: 'desc' }
     })
@@ -680,9 +740,12 @@ export async function getGlobalEggStats() {
 }
 
 export async function getGlobalSalesStats() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const sales = await tx.sale.findMany({
+      where: { farmId: activeFarmId },
       include: { items: true },
       orderBy: { saleDate: 'desc' }
     })
@@ -699,9 +762,12 @@ export async function getGlobalSalesStats() {
 }
 
 export async function getGlobalFeedStats() {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const inventory = await tx.inventory.findMany({
+      where: { farmId: activeFarmId },
       include: { feedingLogs: { include: { batch: true } } }
     })
     return inventory.map((item: any) => ({

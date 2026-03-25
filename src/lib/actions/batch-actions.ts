@@ -2,13 +2,7 @@
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
-
-async function getUserId() {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  return session.user.id
-}
+import { getAuthContext } from '@/lib/auth-utils'
 
 export async function createBatch(data: {
   houseId: number
@@ -16,11 +10,14 @@ export async function createBatch(data: {
   initialCount: number
   arrivalDate: string
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const batch = await tx.batch.create({
       data: {
         houseId: data.houseId,
+        farmId: activeFarmId,
         breedType: data.breedType,
         initialCount: data.initialCount,
         currentCount: data.initialCount,
@@ -45,10 +42,12 @@ export async function updateBatch(id: number, data: {
   arrivalDate?: string
   status?: string
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const batch = await tx.batch.update({
-      where: { id },
+      where: { id, farmId: activeFarmId },
       data: {
         ...data,
         arrivalDate: data.arrivalDate ? new Date(data.arrivalDate) : undefined,
@@ -63,10 +62,12 @@ export async function updateBatch(id: number, data: {
 }
 
 export async function deleteBatch(id: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     await tx.batch.delete({
-      where: { id }
+      where: { id, farmId: activeFarmId }
     })
     revalidatePath('/dashboard/flocks')
     return { success: true }
@@ -84,11 +85,14 @@ export async function logMortality(data: {
   reason?: string
   logDate: string
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const mortality = await tx.mortality.create({
       data: {
         batchId: data.batchId,
+        farmId: activeFarmId,
         count: data.count,
         category: data.category,
         subCategory: data.subCategory,
@@ -100,7 +104,7 @@ export async function logMortality(data: {
     
     // Update current count in batch
     await tx.batch.update({
-      where: { id: data.batchId },
+      where: { id: data.batchId, farmId: activeFarmId },
       data: {
         currentCount: {
           decrement: data.count

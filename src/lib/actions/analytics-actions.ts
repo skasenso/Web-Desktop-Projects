@@ -1,20 +1,15 @@
 'use server'
 
 import prisma from '@/lib/db'
-import { auth } from '@/auth'
-
-async function getUserId() {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  return session.user.id
-}
+import { getAuthContext } from '@/lib/auth-utils'
 
 export async function getBatchAnalytics(batchId: number) {
-  const userId = await getUserId()
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
   
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const batch = await tx.batch.findUnique({
-      where: { id: batchId },
+      where: { id: batchId, farmId: activeFarmId },
       include: {
         feedingLogs: true,
         weightRecords: {
@@ -47,12 +42,14 @@ export async function getBatchAnalytics(batchId: number) {
 }
 
 export async function getMortalityTrends(farmId: number) {
-  const userId = await getUserId()
+  const { userId, activeFarmId } = await getAuthContext()
+  const targetFarmId = farmId || activeFarmId
+  if (!targetFarmId) throw new Error('No farm ID provided')
   
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  return await (prisma as any).$withFarmContext(userId, targetFarmId, async (tx: any) => {
     const mortalityData = await tx.mortality.findMany({
       where: {
-        batch: { farmId: farmId }
+        farmId: targetFarmId
       },
       orderBy: { logDate: 'asc' }
     })

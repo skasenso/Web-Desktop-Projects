@@ -2,18 +2,29 @@ import React from 'react';
 import { getDashboardStats } from '@/lib/actions/dashboard-actions';
 import { DashboardContent } from './DashboardContent';
 import prisma from '@/lib/db';
-import { auth } from '@/auth';
+import { getAuthContext } from '@/lib/auth-utils';
 
 export default async function DashboardPage() {
-  const session = await auth();
-  const userId = session?.user?.id || 'placeholder';
+  const { userId, activeFarmId } = await getAuthContext();
+  if (!activeFarmId) {
+    return (
+      <div className="p-8 text-center bg-yellow-50 rounded-lg border border-yellow-200">
+        <h2 className="text-xl font-bold text-yellow-800 mb-2">No Active Farm</h2>
+        <p className="text-yellow-600">
+          You are not currently linked to an active farm. Please create or join a farm to view the dashboard.
+        </p>
+      </div>
+    );
+  }
 
   try {
     const stats = await getDashboardStats();
     
-    // Use $withUser for direct queries to satisfy RLS
-    const housesRaw = await (prisma as any).$withUser(userId, async (tx: any) => {
-      return await tx.house.findMany();
+    // Use $withFarmContext for direct queries
+    const housesRaw = await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
+      return await tx.house.findMany({
+        where: { farmId: activeFarmId }
+      });
     });
     
     // Serialize Decimal objects to numbers for Client Components

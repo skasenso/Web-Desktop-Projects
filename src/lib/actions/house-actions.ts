@@ -2,22 +2,18 @@
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
-
-async function getUserId() {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  return session.user.id
-}
+import { getAuthContext } from '@/lib/auth-utils'
 
 export async function updateHouse(id: number, data: {
   name?: string
   capacity?: number
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const house = await tx.house.update({
-      where: { id },
+      where: { id, farmId: activeFarmId },
       data
     })
     revalidatePath('/dashboard/climate')
@@ -37,10 +33,12 @@ export async function updateHouse(id: number, data: {
 }
 
 export async function deleteHouse(id: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     await tx.house.delete({
-      where: { id }
+      where: { id, farmId: activeFarmId }
     })
     revalidatePath('/dashboard/climate')
     revalidatePath('/dashboard/settings')

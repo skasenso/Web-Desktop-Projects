@@ -4,115 +4,73 @@ async function applyRLS() {
   const prisma = new PrismaClient();
   
   const statements = [
-    // Helper function
-    `CREATE OR REPLACE FUNCTION is_farm_member(_farm_id INTEGER, _user_id TEXT)
-     RETURNS BOOLEAN AS $$
-     BEGIN
-       RETURN EXISTS (
-         SELECT 1 FROM "farms" f WHERE f.id = _farm_id AND f."userId" = _user_id
-       ) OR EXISTS (
-         SELECT 1 FROM "farm_members" fm WHERE fm."farmId" = _farm_id AND fm."userId" = _user_id
-       );
-     END;
-     $$ LANGUAGE plpgsql SECURITY DEFINER;`,
+    // Helper function to get current user ID
+    `CREATE OR REPLACE FUNCTION current_app_user() RETURNS text AS $$
+      SELECT current_setting('app.current_user_id', true);
+    $$ LANGUAGE sql STABLE;`,
 
-    // Farm
+    // Helper function to get current farm ID
+    `CREATE OR REPLACE FUNCTION current_app_farm() RETURNS integer AS $$
+      SELECT NULLIF(current_setting('app.current_farm_id', true), '')::integer;
+    $$ LANGUAGE sql STABLE;`,
+
+    // Farm: Users can see farms they belong to
     `DROP POLICY IF EXISTS farm_isolation_policy ON "farms"`,
     `CREATE POLICY farm_isolation_policy ON "farms" 
      FOR ALL USING (
-       "userId" = current_setting('app.current_user_id', true) OR
+       "userId" = current_app_user() OR
        EXISTS (
          SELECT 1 FROM "farm_members" fm 
-         WHERE fm."farmId" = "farms".id AND fm."userId" = current_setting('app.current_user_id', true)
+         WHERE fm."farmId" = "farms".id AND fm."userId" = current_app_user()
        )
      )`,
 
-    // House
-    `DROP POLICY IF EXISTS house_isolation_policy ON "poultry_houses"`,
-    `CREATE POLICY house_isolation_policy ON "poultry_houses" 
+    // Farm Members: Users can see members of farms they belong to
+    `DROP POLICY IF EXISTS member_isolation_policy ON "farm_members"`,
+    `CREATE POLICY member_isolation_policy ON "farm_members"
      FOR ALL USING (
-       is_farm_member("farmId", current_setting('app.current_user_id', true))
-     )`,
-
-    // Batch
-    `DROP POLICY IF EXISTS batch_isolation_policy ON "batches"`,
-    `CREATE POLICY batch_isolation_policy ON "batches" 
-     FOR ALL USING (
-       EXISTS (
-         SELECT 1 FROM "poultry_houses" ph 
-         WHERE ph.id = "batches"."houseId" AND is_farm_member(ph."farmId", current_setting('app.current_user_id', true))
+       "farmId" IN (
+         SELECT f.id FROM "farms" f WHERE f."userId" = current_app_user()
+         UNION
+         SELECT fm."farmId" FROM "farm_members" fm WHERE fm."userId" = current_app_user()
        )
      )`,
 
-    // Production Logs
-    `DROP POLICY IF EXISTS production_select_policy ON "production_logs"`,
-    `CREATE POLICY production_select_policy ON "production_logs"
-     FOR SELECT USING (
-       (
-         EXISTS (
-           SELECT 1 FROM "users" u 
-           WHERE u.id = current_setting('app.current_user_id', true) 
-           AND u.role IN ('OWNER', 'MANAGER')
+    // Generic Policy for all data tables that have farmId
+    ...[
+      ['houses', 'house_isolation_policy'],
+      ['batches', 'batch_isolation_policy'],
+      ['inventory', 'inventory_isolation_policy'],
+      ['daily_feeding_logs', 'feeding_isolation_policy'],
+      ['health_records', 'health_isolation_policy'],
+      ['egg_production', 'egg_production_isolation_policy'],
+      ['mortality', 'mortality_isolation_policy'],
+      ['weight_records', 'weight_isolation_policy'],
+      ['sales', 'sales_isolation_policy'],
+      ['sale_items', 'sale_items_isolation_policy']
+    ].map(([table, policy]) => [
+      `DROP POLICY IF EXISTS ${policy} ON "${table}"`,
+      `CREATE POLICY ${policy} ON "${table}" 
+       FOR ALL USING (
+         "farmId" = current_app_farm() OR
+         "farmId" IN (
+           SELECT fm."farmId" FROM "farm_members" fm WHERE fm."userId" = current_app_user()
+           UNION
+           SELECT f.id FROM "farms" f WHERE f."userId" = current_app_user()
          )
-       ) OR (
-         "userId" = current_setting('app.current_user_id', true)
-       )
-     )`,
-
-    `DROP POLICY IF EXISTS production_insert_policy ON "production_logs"`,
-    `CREATE POLICY production_insert_policy ON "production_logs"
-     FOR INSERT WITH CHECK (
-       EXISTS (
-         SELECT 1 FROM "batches" b
-         JOIN "poultry_houses" ph ON b."houseId" = ph.id
-         WHERE b.id = "production_logs"."batchId" 
-         AND is_farm_member(ph."farmId", current_setting('app.current_user_id', true))
-       )
-     )`,
-
-    `DROP POLICY IF EXISTS production_modify_policy ON "production_logs"`,
-    `CREATE POLICY production_modify_policy ON "production_logs"
-     FOR UPDATE USING (
-       EXISTS (
-         SELECT 1 FROM "users" u 
-         WHERE u.id = current_setting('app.current_user_id', true) 
-         AND u.role IN ('OWNER', 'MANAGER')
-       )
-     )`,
-
-    // Inventory
-    `DROP POLICY IF EXISTS inventory_isolation_policy ON "feed_inventory"`,
-    `CREATE POLICY inventory_isolation_policy ON "feed_inventory" 
-     FOR ALL USING (
-       "userId" = current_setting('app.current_user_id', true) OR
-       EXISTS (
-         SELECT 1 FROM "users" u 
-         WHERE u.id = current_setting('app.current_user_id', true) 
-         AND u.role IN ('OWNER', 'MANAGER')
-         AND EXISTS (
-             SELECT 1 FROM "farms" f WHERE f."userId" = "feed_inventory"."userId"
-         )
-       )
-     )` ,
-
-    // Weight Records
-    `DROP POLICY IF EXISTS weight_isolation_policy ON "weight_records"`,
-    `CREATE POLICY weight_isolation_policy ON "weight_records" 
-     FOR ALL USING (
-       is_farm_member((SELECT "farmId" FROM "houses" JOIN "batches" ON "houses".id = "batches"."houseId" WHERE "batches".id = "weight_records"."batchId"), current_app_user())
-     )`
+       )`
+    ]).flat()
   ];
 
-  console.log('Applying RLS policies statement by statement...');
+  console.log('Applying RLS policies for Farm-Isolation...');
 
   for (const sql of statements) {
     try {
-      console.log(`Executing: ${sql.substring(0, 50)}...`);
+      console.log(`Executing: ${sql.substring(0, 70)}...`);
       await prisma.$executeRawUnsafe(sql);
     } catch (error) {
-      console.error(`Error executing statement: ${sql.substring(0, 50)}...`);
+      console.error(`Error executing statement: ${sql.substring(0, 70)}...`);
       console.error(error.message);
-      // We continue to the next one unless it's a fatal setup error
     }
   }
 

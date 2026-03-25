@@ -1,29 +1,27 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/auth'
+import { getAuthContext } from '@/lib/auth-utils'
 import prisma from '@/lib/db'
 import { getBatchAnalytics, getMortalityTrends } from '@/lib/actions/analytics-actions'
 
 export async function GET(req: Request) {
-  const session = await auth()
-  if (!session?.user?.id) {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const userId = session.user.id
   const { searchParams } = new URL(req.url)
   const farmIdStr = searchParams.get('farmId')
-  
-  if (!farmIdStr) {
-    return NextResponse.json({ error: 'farmId is required' }, { status: 400 })
+  const farmId = farmIdStr ? parseInt(farmIdStr) : activeFarmId
+
+  if (!farmId) {
+    return NextResponse.json({ error: 'farmId is required or no active farm' }, { status: 400 })
   }
 
-  const farmId = parseInt(farmIdStr)
-
   try {
-    return await (prisma as any).$withUser(userId, async (tx: any) => {
+    return await (prisma as any).$withFarmContext(userId, farmId, async (tx: any) => {
       // Get all active batches for the farm
       const activeBatches = await tx.batch.findMany({
-        where: { farm: { id: farmId }, status: 'active' },
+        where: { farmId: farmId, status: 'active' },
         select: { id: true, breedType: true }
       })
 
@@ -41,6 +39,7 @@ export async function GET(req: Request) {
       // Get low inventory alerts
       const lowInventory = await tx.inventory.findMany({
         where: {
+          farmId: farmId,
           stockLevel: { lt: 500 } // Example threshold
         }
       })

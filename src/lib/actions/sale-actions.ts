@@ -2,28 +2,25 @@
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
-
-async function getUserId() {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  return session.user.id
-}
+import { getAuthContext } from '@/lib/auth-utils'
 
 export async function createSale(data: {
   customerName?: string
   totalAmount: number
   items: { description: string; quantity: number; unitPrice: number; totalPrice: number }[]
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const sale = await tx.sale.create({
       data: {
         customerName: data.customerName,
         totalAmount: data.totalAmount,
         userId: userId,
+        farmId: activeFarmId,
         items: {
-          create: data.items
+          create: data.items.map(item => ({ ...item, farmId: activeFarmId }))
         }
       }
     })
@@ -36,14 +33,16 @@ export async function createSale(data: {
 }
 
 export async function deleteSale(id: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     // Delete sale items first if not handled by cascade
     await tx.saleItem.deleteMany({
-      where: { saleId: id }
+      where: { saleId: id, farmId: activeFarmId }
     })
     await tx.sale.delete({
-      where: { id }
+      where: { id, farmId: activeFarmId }
     })
     revalidatePath('/dashboard/sales')
     return { success: true }

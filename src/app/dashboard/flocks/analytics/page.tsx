@@ -7,7 +7,7 @@ import Link from 'next/link';
 
 export default async function FlocksAnalyticsPage() {
   const batches = await getGlobalFlockStats();
-  const activeBatches = batches.filter((b: any) => b.status === 'ACTIVE');
+  const activeBatches = batches.filter((b: any) => b.status === 'active');
   const totalBirds = activeBatches.reduce((acc: number, b: any) => acc + b.currentQuantity, 0);
   const totalMortality = batches.reduce((acc: number, b: any) => acc + b.totalMortality, 0);
 

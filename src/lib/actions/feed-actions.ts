@@ -2,13 +2,7 @@
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
-
-async function getUserId() {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  return session.user.id
-}
+import { getAuthContext } from '@/lib/auth-utils'
 
 export async function createFeedingLog(data: {
   batchId: number
@@ -16,11 +10,14 @@ export async function createFeedingLog(data: {
   amountConsumed: number
   logDate: string
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const log = await tx.feedingLog.create({
       data: {
         batchId: data.batchId,
+        farmId: activeFarmId,
         feedTypeId: data.feedTypeId,
         amountConsumed: data.amountConsumed,
         logDate: new Date(data.logDate),
@@ -30,7 +27,7 @@ export async function createFeedingLog(data: {
 
     // Update inventory
     await tx.inventory.update({
-      where: { id: data.feedTypeId },
+      where: { id: data.feedTypeId, farmId: activeFarmId },
       data: {
         stockLevel: {
           decrement: data.amountConsumed
@@ -51,10 +48,12 @@ export async function updateFeedingLog(id: number, data: {
   oldAmount: number
   feedTypeId: number
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const log = await tx.feedingLog.update({
-      where: { id },
+      where: { id, farmId: activeFarmId },
       data: {
         amountConsumed: data.amountConsumed
       }
@@ -63,7 +62,7 @@ export async function updateFeedingLog(id: number, data: {
     // Adjust inventory
     const difference = data.amountConsumed - data.oldAmount
     await tx.inventory.update({
-      where: { id: data.feedTypeId },
+      where: { id: data.feedTypeId, farmId: activeFarmId },
       data: {
         stockLevel: {
           decrement: difference
@@ -83,15 +82,17 @@ export async function deleteFeedingLog(id: number, data: {
   amountConsumed: number
   feedTypeId: number
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     await tx.feedingLog.delete({
-      where: { id }
+      where: { id, farmId: activeFarmId }
     })
 
     // Restore inventory
     await tx.inventory.update({
-      where: { id: data.feedTypeId },
+      where: { id: data.feedTypeId, farmId: activeFarmId },
       data: {
         stockLevel: {
           increment: data.amountConsumed

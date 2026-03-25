@@ -2,13 +2,7 @@
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
-
-async function getUserId() {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  return session.user.id
-}
+import { getAuthContext } from '@/lib/auth-utils'
 
 export async function createInventoryItem(data: {
   itemName: string
@@ -16,12 +10,15 @@ export async function createInventoryItem(data: {
   unit: string
   category?: string
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const item = await tx.inventory.create({
       data: {
         ...data,
-        userId: userId
+        userId: userId,
+        farmId: activeFarmId
       }
     })
     revalidatePath('/dashboard/feed')
@@ -38,10 +35,12 @@ export async function updateInventoryItem(id: number, data: {
   unit?: string
   category?: string
 }) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const item = await tx.inventory.update({
-      where: { id },
+      where: { id, farmId: activeFarmId },
       data
     })
     revalidatePath('/dashboard/feed')
@@ -53,10 +52,12 @@ export async function updateInventoryItem(id: number, data: {
 }
 
 export async function deleteInventoryItem(id: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     await tx.inventory.delete({
-      where: { id }
+      where: { id, farmId: activeFarmId }
     })
     revalidatePath('/dashboard/feed')
     return { success: true }

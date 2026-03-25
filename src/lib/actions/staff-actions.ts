@@ -2,83 +2,60 @@
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
+import { getAuthContext } from '@/lib/auth-utils'
 import { Role } from '@prisma/client'
 
-async function getUserId() {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  return session.user.id
-}
-
 export async function inviteWorker(data: { emailOrPhone: string, role: Role }) {
-  console.log('--- inviteWorker called with:', data);
   try {
-    const userId = await getUserId()
+    const { userId, activeFarmId } = await getAuthContext()
+    if (!activeFarmId) throw new Error('No active farm selected')
     
-    return await (prisma as any).$withUser(userId, async (tx: any) => {
-    // Ensure the current user is an OWNER or MANAGER
-    const currentUser = await tx.user.findUnique({
-      where: { id: userId }
-    })
-
-    if (currentUser.role === 'WORKER') {
-      throw new Error('Only Owners or Managers can invite staff')
-    }
-
-      let farm = await tx.farm.findFirst({
-        where: { userId: userId }
+    return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
+      // Ensure the current user is an OWNER or MANAGER
+      const currentUser = await tx.user.findUnique({
+        where: { id: userId }
       })
 
-      if (!farm) {
-        // If not the owner, check if they are a manager/worker in a farm
-        const membership = await tx.farmMember.findFirst({
-          where: { userId: userId },
-          include: { farm: true }
-        })
-        if (membership) {
-          farm = membership.farm
+      if (currentUser.role === 'WORKER') {
+        throw new Error('Only Owners or Managers can invite staff')
+      }
+
+      const isEmail = data.emailOrPhone.includes('@')
+      const email = isEmail ? data.emailOrPhone : null
+      const phone = isEmail ? null : data.emailOrPhone
+
+      const existingInvite = await tx.invitation.findFirst({
+        where: {
+          farmId: activeFarmId,
+          OR: isEmail ? [{ email: email }] : [{ phoneNumber: phone }]
         }
-      }
-
-      if (!farm) throw new Error('Farm not found. You must create a farm first.')
-
-    const isEmail = data.emailOrPhone.includes('@')
-    const email = isEmail ? data.emailOrPhone : null
-    const phone = isEmail ? null : data.emailOrPhone
-
-    const existingInvite = await tx.invitation.findFirst({
-      where: {
-        farmId: farm.id,
-        OR: isEmail ? [{ email: email }] : [{ phoneNumber: phone }]
-      }
-    })
-
-    if (existingInvite) {
-      if (existingInvite.status === 'ACCEPTED') {
-        throw new Error('This user is already a member of the farm')
-      }
-      // Update role if already pending
-      const invitation = await tx.invitation.update({
-        where: { id: existingInvite.id },
-        data: { role: data.role }
       })
+
+      if (existingInvite) {
+        if (existingInvite.status === 'ACCEPTED') {
+          throw new Error('This user is already a member of the farm')
+        }
+        // Update role if already pending
+        const invitation = await tx.invitation.update({
+          where: { id: existingInvite.id },
+          data: { role: data.role }
+        })
+        revalidatePath('/dashboard/team')
+        return { success: true, invitation }
+      }
+
+      const invitation = await tx.invitation.create({
+        data: {
+          email: email,
+          phoneNumber: phone,
+          farmId: activeFarmId,
+          role: data.role,
+          status: 'PENDING'
+        }
+      })
+
       revalidatePath('/dashboard/team')
       return { success: true, invitation }
-    }
-
-    const invitation = await tx.invitation.create({
-      data: {
-        email: email,
-        phoneNumber: phone,
-        farmId: farm.id,
-        role: data.role,
-        status: 'PENDING'
-      }
-    })
-
-    revalidatePath('/dashboard/team')
-    return { success: true, invitation }
     })
   } catch (error: any) {
     console.error('Fatal error inviting worker:', error)
@@ -87,11 +64,8 @@ export async function inviteWorker(data: { emailOrPhone: string, role: Role }) {
 }
 
 export async function acceptInvitation() {
-  const session = await auth()
-  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
+  const { userId } = await getAuthContext()
   
-  const userId = session.user.id
-
   try {
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } })
@@ -149,17 +123,12 @@ export async function acceptInvitation() {
 }
 
 export async function getFarmMembers() {
-  const userId = await getUserId()
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { members: [], invitations: [] }
   
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
-    const farm = await tx.farm.findFirst({
-      where: { userId: userId }
-    })
-
-    if (!farm) return []
-
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const members = await tx.farmMember.findMany({
-      where: { farmId: farm.id },
+      where: { farmId: activeFarmId },
       include: {
         user: true
       }
@@ -167,7 +136,7 @@ export async function getFarmMembers() {
 
     const invitations = await tx.invitation.findMany({
       where: { 
-        farmId: farm.id,
+        farmId: activeFarmId,
         status: 'PENDING'
       }
     })
@@ -175,9 +144,12 @@ export async function getFarmMembers() {
     return { members, invitations }
   })
 }
+
 export async function deleteMember(memberId: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     // Only Owners or Managers can delete members
     const currentUser = await tx.user.findUnique({
       where: { id: userId }
@@ -185,7 +157,7 @@ export async function deleteMember(memberId: number) {
     if (currentUser.role === 'WORKER') throw new Error('Unauthorized')
 
     await tx.farmMember.delete({
-      where: { id: memberId }
+      where: { id: memberId, farmId: activeFarmId }
     })
     revalidatePath('/dashboard/team')
     return { success: true }
@@ -196,15 +168,17 @@ export async function deleteMember(memberId: number) {
 }
 
 export async function deleteInvitation(invitationId: number) {
-  const userId = await getUserId()
-  return await (prisma as any).$withUser(userId, async (tx: any) => {
+  const { userId, activeFarmId } = await getAuthContext()
+  if (!activeFarmId) throw new Error('No active farm selected')
+
+  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const currentUser = await tx.user.findUnique({
       where: { id: userId }
     })
     if (currentUser.role === 'WORKER') throw new Error('Unauthorized')
 
     await tx.invitation.delete({
-      where: { id: invitationId }
+      where: { id: invitationId, farmId: activeFarmId }
     })
     revalidatePath('/dashboard/team')
     return { success: true }

@@ -7,24 +7,23 @@ async function main() {
 
   // 1. Ensure a user exists
   const user = await prisma.user.upsert({
-    where: { clerkId: userId },
+    where: { email: 'ahors@example.com' },
     update: {},
     create: {
-      id:'user_placeholder', // To match the default userId in schema for now
+      id: 'user_placeholder',
       email: 'ahors@example.com',
       name: 'Farmer John',
-      clerkId: userId,
+      phoneNumber: '+1234567890',
+      role: 'OWNER',
     },
   })
 
-  // We use $executeRaw to bypass RLS for seeding or use the extension
-  await prisma.$executeRawUnsafe(`SET app.current_user_id = '${user.id}';`);
-
-  // 1. Create a Farm
+  // 2. Create a Farm
   const farm = await prisma.farm.upsert({
     where: { id: 1 },
     update: {},
     create: {
+      id: 1,
       name: 'Green Valley Poultry',
       location: '123 Farm Road, Rural County',
       capacity: 50000,
@@ -32,13 +31,25 @@ async function main() {
     },
   })
 
-  // 2. Create two Poultry Houses
-  const house1 = await prisma.poultryHouse.upsert({
-    where: { id: 1 },
+  // 3. Create a Farm Member (Owner)
+  await prisma.farmMember.upsert({
+    where: { farmId_userId: { farmId: farm.id, userId: user.id } },
     update: {},
     create: {
       farmId: farm.id,
-      houseNumber: 'H-01',
+      userId: user.id,
+      role: 'OWNER'
+    }
+  })
+
+  // 4. Create two Poultry Houses
+  const house1 = await prisma.house.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      farmId: farm.id,
+      name: 'H-01',
       capacity: 10000,
       currentTemperature: 28.5,
       currentHumidity: 65,
@@ -46,12 +57,13 @@ async function main() {
     },
   })
 
-  const house2 = await prisma.poultryHouse.upsert({
+  const house2 = await prisma.house.upsert({
     where: { id: 2 },
     update: {},
     create: {
+      id: 2,
       farmId: farm.id,
-      houseNumber: 'H-02',
+      name: 'H-02',
       capacity: 15000,
       currentTemperature: 27.8,
       currentHumidity: 62,
@@ -59,12 +71,14 @@ async function main() {
     },
   })
 
-  // 3. Create a Broiler Batch
+  // 5. Create a Broiler Batch
   const batch = await prisma.batch.upsert({
     where: { id: 1 },
     update: {},
     create: {
+      id: 1,
       houseId: house1.id,
+      farmId: farm.id,
       breedType: 'Broiler',
       initialCount: 5000,
       currentCount: 4950,
@@ -74,36 +88,41 @@ async function main() {
     },
   })
 
-  // 4. Create Feed Inventory
-  await prisma.feedInventory.upsert({
+  // 6. Create Feed Inventory
+  await prisma.inventory.upsert({
     where: { id: 1 },
     update: {},
     create: {
-      feedType: 'Starter Feed',
+      id: 1,
+      itemName: 'Starter Feed',
       stockLevel: 1200.50,
       unit: 'kg',
-      userId: user.id
+      userId: user.id,
+      farmId: farm.id
     },
   })
 
-  await prisma.feedInventory.upsert({
+  await prisma.inventory.upsert({
     where: { id: 2 },
     update: {},
     create: {
-      feedType: 'Grower Feed',
+      id: 2,
+      itemName: 'Grower Feed',
       stockLevel: 450.00,
       unit: 'kg',
-      userId: user.id
+      userId: user.id,
+      farmId: farm.id
     },
   })
 
-  // 5. Add some logs
-  await prisma.productionLog.create({
+  // 7. Add some logs
+  await prisma.mortality.create({
     data: {
       batchId: batch.id,
-      mortalityCount: 10,
+      count: 10,
       logDate: new Date(),
-      userId: user.id
+      userId: user.id,
+      farmId: farm.id
     }
   })
 
