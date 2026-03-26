@@ -60,6 +60,13 @@ export default async function DashboardLayout({
     );
   }
 
+  // If user has a farm but no name yet (invited member on first login), redirect to profile setup
+  if (farm && !dbUser?.firstname && dbUser?.role !== 'OWNER') {
+    const currentPath = '/dashboard';
+    // Only redirect if not already on the profile page to avoid loops
+    redirect('/onboarding/profile');
+  }
+
   return (
     <SidebarWrapper role={dbUser?.role as any}>
       {children}

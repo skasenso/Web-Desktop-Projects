@@ -18,6 +18,8 @@ model User {
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
   name          String?
+  middleName    String?      @map("middle_name")
+  password      String?
   phoneNumber   String?      @unique @map("phone_number")
   accounts      Account[]
   batches       Batch[]
@@ -88,6 +90,7 @@ model Farm {
   weightRecords   WeightRecord[]
   sales           Sale[]
   saleItems       SaleItem[]
+  settings        FarmSettings?
 
   @@index([userId])
   @@map("farms")
@@ -131,6 +134,8 @@ model Batch {
   healthRecords    HealthRecord[]
   mortalityRecords Mortality[]
   weightRecords    WeightRecord[]
+  vaccinations     VaccinationSchedule[]
+  medications      MedicationSchedule[]
 
   @@index([userId])
   @@index([farmId])
@@ -138,17 +143,18 @@ model Batch {
 }
 
 model Inventory {
-  id          Int          @id @default(autoincrement())
-  itemName    String
-  stockLevel  Decimal      @db.Decimal(10, 2)
-  unit        String
-  category    String?
-  userId      String       @default("user_placeholder")
-  farmId      Int          @default(1)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  feedingLogs FeedingLog[]
-  farm        Farm         @relation(fields: [farmId], references: [id])
+  id           Int          @id @default(autoincrement())
+  itemName     String
+  stockLevel   Decimal      @db.Decimal(10, 2)
+  reorderLevel Decimal?     @default(500.00) @db.Decimal(10, 2)
+  unit         String
+  category     String?
+  userId       String       @default("user_placeholder")
+  farmId       Int          @default(1)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  feedingLogs  FeedingLog[]
+  farm         Farm         @relation(fields: [farmId], references: [id])
 
   @@index([userId])
   @@index([farmId])
@@ -306,4 +312,63 @@ enum Role {
   OWNER
   MANAGER
   WORKER
+}
+
+model VaccinationSchedule {
+  id            Int      @id @default(autoincrement())
+  batchId       Int
+  vaccineName   String
+  scheduledDate DateTime
+  status        String   @default("PENDING") // PENDING, COMPLETED, SKIPPED
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  batch         Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@map("vaccination_schedules")
+}
+
+model MedicationSchedule {
+  id             Int      @id @default(autoincrement())
+  batchId        Int
+  medicationName String
+  scheduledDate  DateTime
+  status         String   @default("PENDING") // PENDING, COMPLETED, SKIPPED
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  batch          Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@map("medication_schedules")
+}
+
+model FarmSettings {
+  id                     Int      @id @default(autoincrement())
+  farmId                 Int      @unique
+  eggRecordReminderTime  String?  @default("18:00") // 24h format
+  feedRecordReminderTime String?  @default("18:00")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  farm                   Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@map("farm_settings")
+}
+
+model AuditLog {
+  id            Int      @id @default(autoincrement())
+  tableName     String   @map("table_name")
+  recordId      Int      @map("record_id")
+  attributeName String   @map("attribute_name")
+  oldValue      String?  @map("old_value")
+  newValue      String?  @map("new_value")
+  reason        String?
+  userId        String   @map("user_id")
+  farmId        Int      @map("farm_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([farmId])
+  @@index([userId])
+  @@map("audit_logs")
 }

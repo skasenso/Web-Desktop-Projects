@@ -3,6 +3,7 @@
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
+import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
 
 export async function getDashboardStats() {
@@ -362,20 +363,32 @@ export async function updateFarmInfo(data: { name: string, location?: string, ca
   })
 }
 
-export async function createHouse(data: { houseNumber: string, capacity: number }) {
+export async function createHouse(data: { houseNumber: string, capacity: number } | FormData) {
   const { userId, activeFarmId } = await getAuthContext()
   if (!activeFarmId) throw new Error('No active farm selected')
+
+  let houseName: string;
+  let houseCapacity: number;
+
+  if (data instanceof FormData) {
+    houseName = (data.get('name') as string) || (data.get('houseNumber') as string);
+    houseCapacity = parseInt(data.get('capacity') as string);
+  } else {
+    houseName = data.houseNumber;
+    houseCapacity = data.capacity;
+  }
 
   return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
     const house = await tx.house.create({
       data: {
-        name: data.houseNumber,
-        capacity: data.capacity,
+        name: houseName,
+        capacity: houseCapacity,
         farmId: activeFarmId,
         userId: userId
       }
     })
     revalidatePath('/dashboard/settings')
+    revalidatePath('/dashboard/houses')
     revalidatePath('/dashboard')
     return { success: true, house }
   }).catch((error: any) => {
@@ -428,6 +441,134 @@ export async function checkOnboardingStatus() {
   return { isOnboarded: !!membership }
 }
 
+export async function registerUser(data: { emailOrPhone: string, password: string, name: string }) {
+  try {
+    const isEmail = data.emailOrPhone.includes('@');
+    const email = isEmail ? data.emailOrPhone.toLowerCase().trim() : null;
+    const phone = isEmail ? null : data.emailOrPhone.trim();
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: email || undefined },
+          { phoneNumber: phone || undefined }
+        ].filter(Boolean) as any
+      }
+    }) as any;
+
+    if (existingUser) {
+      if (existingUser.password) {
+        return { success: false, error: 'User already exists and has a password set' };
+      }
+      // If user exists but has no password (e.g. created via invitation or OAuth before)
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      const { firstname, surname, middleName } = splitName(data.name);
+      
+      await (prisma.user as any).update({
+        where: { id: existingUser.id },
+        data: {
+          password: hashedPassword,
+          firstname,
+          surname,
+          middleName,
+          name: data.name
+        }
+      });
+      return { success: true, userId: existingUser.id };
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const { firstname, surname, middleName } = splitName(data.name);
+
+    // Create user
+    const newUser = await (prisma.user as any).create({
+      data: {
+        email,
+        phoneNumber: phone,
+        password: hashedPassword,
+        name: data.name,
+        firstname,
+        surname,
+        middleName,
+        role: 'OWNER' // Default role for self-signup
+      }
+    });
+
+    // Check for pending invitations
+    const invitation = await (prisma.invitation as any).findFirst({
+      where: {
+        OR: [
+          { email: email || undefined },
+          { phoneNumber: phone || undefined }
+        ].filter(Boolean) as any,
+        status: 'PENDING'
+      }
+    });
+
+    if (invitation) {
+      // Auto-accept invitation
+      await prisma.$transaction([
+        (prisma.farmMember as any).create({
+          data: {
+            farmId: invitation.farmId,
+            userId: (newUser as any).id,
+            role: (invitation as any).role
+          }
+        }),
+        (prisma.invitation as any).update({
+          where: { id: (invitation as any).id },
+          data: { status: 'ACCEPTED' }
+        }),
+        (prisma.user as any).update({
+          where: { id: (newUser as any).id },
+          data: { role: (invitation as any).role }
+        })
+      ]);
+    }
+
+    return { success: true, userId: (newUser as any).id };
+  } catch (error: any) {
+    console.error('Error registering user:', error);
+    return { success: false, error: 'Failed to register user' };
+  }
+}
+
+function splitName(name: string) {
+  if (!name) return { firstname: '', surname: '', middleName: '' };
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return { firstname: parts[0], surname: '', middleName: '' };
+  if (parts.length === 2) return { firstname: parts[0], surname: parts[1], middleName: '' };
+  return {
+    firstname: parts[0],
+    surname: parts[parts.length - 1],
+    middleName: parts.slice(1, -1).join(' ')
+  };
+}
+
+export async function updateProfile(data: { firstname: string; surname: string }) {
+  const { userId } = await getAuthContext()
+  if (!userId) return { success: false, error: 'Unauthorized' }
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstname: data.firstname.trim(),
+        surname: data.surname.trim(),
+        middleName: (data as any).middleName?.trim(),
+        name: `${data.firstname.trim()} ${(data as any).middleName ? (data as any).middleName.trim() + ' ' : ''}${data.surname.trim()}`,
+      }
+    })
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating profile:', error)
+    return { success: false, error: 'Failed to update profile' }
+  }
+}
+
 
 export async function getAllEggProduction() {
   const { userId, activeFarmId } = await getAuthContext()
@@ -471,7 +612,8 @@ export async function getAllFeedingLogs() {
       amountConsumed: Number(log.amountConsumed),
       inventory: log.inventory ? {
          ...log.inventory,
-         stockLevel: Number(log.inventory.stockLevel)
+         stockLevel: Number(log.inventory.stockLevel),
+         reorderLevel: log.inventory.reorderLevel ? Number(log.inventory.reorderLevel) : null
       } : null
     }))
   }).catch((error: any) => {
@@ -493,7 +635,8 @@ export async function getAllInventory() {
     })
     return items.map((item: any) => ({
       ...item,
-      stockLevel: Number(item.stockLevel)
+      stockLevel: Number(item.stockLevel),
+      reorderLevel: item.reorderLevel ? Number(item.reorderLevel) : null
     }))
   }).catch((error: any) => {
     console.error('Error fetching inventory:', error)
@@ -573,6 +716,9 @@ export async function getBatchDetails(id: number) {
         },
         weightRecords: {
           orderBy: { logDate: 'desc' }
+        },
+        vaccinations: {
+          orderBy: { scheduledDate: 'asc' }
         }
       }
     })
@@ -598,7 +744,8 @@ export async function getBatchDetails(id: number) {
       weightRecords: batch.weightRecords.map((rec: any) => ({
         ...rec,
         averageWeight: Number(rec.averageWeight)
-      }))
+      })),
+      vaccinations: (batch as any).vaccinations || []
     }
   }).catch((error: any) => {
     console.error('Error fetching batch details:', error)
@@ -652,6 +799,7 @@ export async function getInventoryDetails(id: number) {
     return {
       ...item,
       stockLevel: Number(item.stockLevel),
+      reorderLevel: item.reorderLevel ? Number(item.reorderLevel) : null,
       feedingLogs: item.feedingLogs.map((log: any) => ({
         ...log,
         amountConsumed: Number(log.amountConsumed)
@@ -773,6 +921,7 @@ export async function getGlobalFeedStats() {
     return inventory.map((item: any) => ({
       ...item,
       stockLevel: Number(item.stockLevel),
+      reorderLevel: item.reorderLevel ? Number(item.reorderLevel) : null,
       feedingLogs: item.feedingLogs.map((log: any) => ({
         ...log,
         amountConsumed: Number(log.amountConsumed)

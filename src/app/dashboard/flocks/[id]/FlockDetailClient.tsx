@@ -15,10 +15,15 @@ import {
   Clock, 
   History,
   Info,
-  ArrowRight
+  ArrowRight,
+  Syringe,
+  Plus,
+  CheckCircle2,
+  Circle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logWeight } from '@/lib/actions/dashboard-actions';
+import { createVaccinationSchedule } from '@/lib/actions/preference-actions';
 import { cn } from '@/lib/utils';
 
 interface FlockDetailClientProps {
@@ -30,6 +35,14 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
   const [weight, setWeight] = useState('');
   const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Vaccination schedule state
+  const [vaccinations, setVaccinations] = useState<any[]>(batch.vaccinations || []);
+  const [showVaccForm, setShowVaccForm] = useState(false);
+  const [vaccName, setVaccName] = useState('');
+  const [vaccDate, setVaccDate] = useState('');
+  const [vaccNotes, setVaccNotes] = useState('');
+  const [isSavingVacc, setIsSavingVacc] = useState(false);
+
   // Calculations
   const arrivalDate = new Date(batch.arrivalDate);
   const today = new Date();
@@ -40,7 +53,6 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
   
   const totalFeed = batch.feedingLogs.reduce((sum: number, log: any) => sum + Number(log.amountConsumed), 0);
   
-  // FCR Calculation (Simplified: Feed / Current Count * Avg Weight if available)
   const latestWeight = batch.weightRecords[0]?.averageWeight || 0;
   const fcr = latestWeight > 0 ? (totalFeed / (batch.currentCount * latestWeight)) : 0;
 
@@ -57,6 +69,29 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
       setWeight('');
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleAddVaccination = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vaccName || !vaccDate) return;
+    setIsSavingVacc(true);
+    try {
+      const result = await createVaccinationSchedule({
+        batchId: batch.id,
+        vaccineName: vaccName,
+        scheduledDate: new Date(vaccDate),
+        notes: vaccNotes || undefined,
+      });
+      setVaccinations(prev => [...prev, result]);
+      setShowVaccForm(false);
+      setVaccName('');
+      setVaccDate('');
+      setVaccNotes('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSavingVacc(false);
     }
   };
 
@@ -191,7 +226,6 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
                  <div className="relative space-y-0 translate-x-3">
                     <div className="absolute left-0 top-0 bottom-0 w-px bg-white/20" />
                     
-                    {/* Combine logs and sort by date */}
                     {[
                       ...batch.feedingLogs.map((l: any) => ({ ...l, type: 'FEED' })),
                       ...batch.mortalityRecords.map((m: any) => ({ ...m, type: 'MORTALITY' })),
@@ -241,19 +275,91 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
 
         {/* Sidebar Info */}
         <div className="space-y-8">
-           <Card className="rounded-[2.5rem] bg-emerald-500/5 border-white/10 backdrop-blur-xl p-8 relative overflow-hidden shadow-2xl">
-              <div className="absolute top-0 right-0 p-8 opacity-[0.03] rotate-12 pointer-events-none">
-                 <History className="w-56 h-56 text-emerald-400" />
-              </div>
-              <h4 className="text-white font-black italic text-xl mb-6">Health Profile</h4>
-              <div className="space-y-5">
-                 <HealthItem label="Current Status" value="Healthy" color="emerald" />
-                 <HealthItem label="Immunity Level" value="94%" color="blue" />
-                 <HealthItem label="Next Vaccination" value="April 12" color="amber" />
-              </div>
-              <Button className="w-full mt-10 py-5 group" variant="glass">
-                 View Full Health History <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
+           {/* Vaccination Schedule */}
+           <Card className="rounded-[2.5rem] bg-emerald-500/5 border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
+              <CardHeader className="bg-white/5 border-b border-white/10 px-6 py-5 flex justify-between items-center">
+                <CardTitle className="text-white italic font-black flex items-center gap-2 text-base">
+                  <Syringe className="w-4 h-4 text-amber-400" /> Vaccination Schedule
+                </CardTitle>
+                <button
+                  onClick={() => setShowVaccForm(!showVaccForm)}
+                  className="p-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </CardHeader>
+              <CardContent className="p-6 space-y-3">
+                <AnimatePresence>
+                  {showVaccForm && (
+                    <motion.form
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      onSubmit={handleAddVaccination}
+                      className="space-y-3 p-4 bg-amber-500/5 rounded-2xl border border-amber-500/15 mb-3"
+                    >
+                      <Input
+                        label="Vaccine Name"
+                        placeholder="e.g. Newcastle IBD"
+                        value={vaccName}
+                        onChange={e => setVaccName(e.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Scheduled Date"
+                        type="date"
+                        value={vaccDate}
+                        onChange={e => setVaccDate(e.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Notes (optional)"
+                        placeholder="Dosage, route..."
+                        value={vaccNotes}
+                        onChange={e => setVaccNotes(e.target.value)}
+                      />
+                      <Button type="submit" isLoading={isSavingVacc} className="w-full" size="sm">
+                        Add Schedule
+                      </Button>
+                    </motion.form>
+                  )}
+                </AnimatePresence>
+
+                {vaccinations.length === 0 ? (
+                  <div className="text-center py-8 text-white/30 text-xs italic">
+                    No vaccinations scheduled yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {vaccinations
+                      .sort((a: any, b: any) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime())
+                      .map((vacc: any, idx: number) => {
+                        const isPast = new Date(vacc.scheduledDate) < today;
+                        const isDone = vacc.status === 'COMPLETED';
+                        return (
+                          <div key={idx} className={cn(
+                            "flex items-center gap-3 p-3 rounded-2xl border transition-all",
+                            isDone ? "bg-emerald-500/10 border-emerald-500/20" : isPast ? "bg-red-500/10 border-red-500/20" : "bg-white/5 border-white/10"
+                          )}>
+                            {isDone ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                            ) : (
+                              <Circle className={cn("w-4 h-4 flex-shrink-0", isPast ? "text-red-400" : "text-amber-400")} />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-xs font-black truncate">{vacc.vaccineName}</p>
+                              <p className={cn("text-[10px] font-bold", isPast && !isDone ? "text-red-400" : "text-white/40")}>
+                                {new Date(vacc.scheduledDate).toLocaleDateString()}
+                                {isPast && !isDone && " · Overdue"}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    }
+                  </div>
+                )}
+              </CardContent>
            </Card>
 
            <Card className="rounded-[2.5rem] bg-white/10 border-white/10 backdrop-blur-xl p-8 shadow-2xl border-dashed">
@@ -262,7 +368,7 @@ export const FlockDetailClient = ({ batch }: FlockDetailClientProps) => {
                  <MetaItem label="Batch ID" value={`FLK-${batch.id.toString().padStart(3, '0')}`} />
                  <MetaItem label="Source" value="Local Hatchery" />
                  <MetaItem label="Housing" value={batch.house?.name || `House ${batch.houseId}`} />
-                 <MetaItem label="Manager" value="Assigned System" />
+                 <MetaItem label="Status" value={batch.status.toUpperCase()} />
               </div>
            </Card>
         </div>
@@ -306,21 +412,9 @@ const MetricCard = ({ title, value, icon: Icon, color, subtext }: any) => {
   );
 };
 
-const HealthItem = ({ label, value, color }: any) => (
-  <div className="flex justify-between items-center group/item cursor-pointer">
-     <span className="text-white/40 text-[10px] font-black uppercase tracking-widest transition-colors uppercase italic">{label}</span>
-     <span className={cn(
-       "text-xs font-black tracking-widest uppercase",
-       color === 'emerald' ? 'text-emerald-400' : 
-       color === 'blue' ? 'text-blue-400' : 'text-amber-400'
-     )}>{value}</span>
-  </div>
-);
-
 const MetaItem = ({ label, value }: any) => (
   <div className="flex flex-col gap-1">
      <span className="text-white/20 text-[8px] font-black uppercase tracking-[0.2em]">{label}</span>
      <span className="text-white font-bold text-sm tracking-tight">{value}</span>
   </div>
 );
-

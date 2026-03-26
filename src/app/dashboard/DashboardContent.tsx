@@ -51,56 +51,25 @@ const FloatingIcon = ({ icon: Icon, className = "" }: { icon: any, className?: s
   </motion.div>
 );
 
-const MiniLineChart = ({ data, color }: { data: number[], color: string }) => {
+const MiniBarChart = ({ data, color }: { data: number[], color: string }) => {
   if (!data || data.length === 0) return null;
   const max = Math.max(...data, 1);
-  const points = data.map((val, i) => ({
-    x: i * (100 / (data.length - 1 || 1)),
-    y: 100 - (val / max) * 100
-  }));
-
-  const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  const areaData = `${pathData} L 100 100 L 0 100 Z`;
 
   return (
-    <div className="flex-1 h-12 mt-4 relative group">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-        {/* Fill Area */}
-        <motion.path
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.2 }}
-          d={areaData}
-          fill="currentColor"
-          className={color.replace('bg-', 'text-')}
-        />
-        {/* Line */}
-        <motion.path
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 1.5, ease: "easeInOut" }}
-          d={pathData}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={color.replace('bg-', 'text-')}
-        />
-        {/* Points */}
-        {points.map((p, i) => (
-          <motion.circle
+    <div className="flex-1 h-12 mt-4 flex items-end gap-1">
+      {data.map((val, i) => {
+        const heightPct = max > 0 ? (val / max) * 100 : 0;
+        return (
+          <motion.div
             key={i}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: i * 0.1 }}
-            cx={p.x}
-            cy={p.y}
-            r="3"
-            fill="white"
-            className="shadow-xl"
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: 1 }}
+            transition={{ duration: 0.5, delay: i * 0.06, ease: 'easeOut' }}
+            style={{ height: `${Math.max(heightPct, 4)}%`, originY: 1 }}
+            className={`flex-1 rounded-t-sm opacity-80 ${color}`}
           />
-        ))}
-      </svg>
+        );
+      })}
     </div>
   );
 };
@@ -182,7 +151,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                     </div>
                  </div>
                  <div className="mt-4 pt-4 border-t border-white/5">
-                    <MiniLineChart data={stats.mortalityTrendData.map(d => d.count)} color="bg-red-400" />
+                    <MiniBarChart data={stats.mortalityTrendData.map(d => d.count)} color="bg-red-400" />
                     <p className="text-[8px] text-center text-red-400/50 uppercase tracking-widest mt-2 font-black">7 Day Mortality Trend</p>
                  </div>
               </div>
@@ -211,7 +180,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                  <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">Overall Total</p>
                </div>
             </div>
-            <MiniLineChart data={stats.eggTrendData.map(d => d.count)} color="bg-blue-500" />
+            <MiniBarChart data={stats.eggTrendData.map(d => d.count)} color="bg-blue-400" />
             <p className="text-[8px] text-center text-white/40 uppercase tracking-widest mt-2">7 Day Trend</p>
           </CardContent>
         </Card>
@@ -226,7 +195,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
               {formatCurrency(stats.revenueTrendData.reduce((acc, curr) => acc + curr.count, 0))}
             </p>
             <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">7 Day Sales Volume</p>
-            <MiniLineChart data={stats.revenueTrendData.map(d => d.count)} color="bg-purple-500" />
+            <MiniBarChart data={stats.revenueTrendData.map(d => d.count)} color="bg-purple-400" />
           </CardContent>
         </Card>
 
@@ -285,7 +254,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
                 <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">Weekly Consumption</p>
              </div>
              <div>
-               <MiniLineChart data={stats.feedTrendData.map(d => d.count)} color="bg-emerald-500" />
+               <MiniBarChart data={stats.feedTrendData.map(d => d.count)} color="bg-emerald-400" />
                <p className="text-[8px] text-center text-white/40 uppercase tracking-widest mt-2">Daily Breakdown (Last 7 Days)</p>
              </div>
           </CardContent>
@@ -365,7 +334,7 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
         title="Register New Batch"
       >
         <div className="p-1">
-          <RegisterBatchForm houses={houses} />
+          <RegisterBatchForm houses={houses} onSuccess={() => setIsRegisterModalOpen(false)} />
         </div>
       </Dialog>
     </div>

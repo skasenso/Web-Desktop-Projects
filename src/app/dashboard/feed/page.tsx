@@ -37,21 +37,23 @@ export default async function FeedPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {inventory.map((item: any) => (
                   <div key={item.id} className="p-5 rounded-2xl border border-gray-100 bg-white hover:border-amber-100 hover:shadow-lg transition-all relative group">
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <InventoryActions item={item} />
-                    </div>
                     <div className="flex justify-between items-start mb-2">
                       <span className="font-bold text-gray-900 text-lg">{item.itemName}</span>
-                      {Number(item.stockLevel) < 500 && (
-                        <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-full font-bold uppercase tracking-wider border border-red-100">Low Stock</span>
+                      {Number(item.stockLevel) <= (item.reorderLevel ?? 500) && (
+                        <span className="text-[10px] bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-black uppercase tracking-widest border border-red-200 animate-pulse shadow-sm shadow-red-100">Low Stock</span>
                       )}
                     </div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl font-extrabold text-gray-900">{Number(item.stockLevel).toLocaleString()}</span>
                       <span className="text-sm text-gray-400 font-medium uppercase tracking-tight">{item.unit}</span>
                     </div>
-                    <div className="mt-3 text-xs text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded inline-block">
-                      {item.category?.toUpperCase()}
+                    <div className="mt-3 flex justify-between items-end">
+                      <div className="text-xs text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded inline-block">
+                        {item.category?.toUpperCase()}
+                      </div>
+                      <div className="opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
+                        <InventoryActions item={item} />
+                      </div>
                     </div>
                   </div>
                 ))}

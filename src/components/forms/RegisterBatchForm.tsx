@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
+import Link from 'next/link';
 
 const formSchema = z.object({
   batchName: z.string().min(2, "Batch name is required"),
@@ -16,6 +17,8 @@ const formSchema = z.object({
   initialQuantity: z.number().min(1, "Quantity must be at least 1"),
   hatchDate: z.string().min(1, "Hatch date is required"),
   houseId: z.string().min(1, "House selection is required"),
+  vaccinationDate: z.string().optional(),
+  vaccineName: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -25,11 +28,13 @@ interface RegisterBatchFormProps {
     id: number;
     name: string;
   }>;
+  onSuccess?: () => void;
 }
 
-export function RegisterBatchForm({ houses }: RegisterBatchFormProps) {
+export function RegisterBatchForm({ houses, onSuccess }: RegisterBatchFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  
   const {
     register,
     handleSubmit,
@@ -40,6 +45,18 @@ export function RegisterBatchForm({ houses }: RegisterBatchFormProps) {
       breed: "Broiler",
     },
   });
+
+  if (houses.length === 0) {
+    return (
+      <div className="p-6 text-center space-y-4">
+        <p className="text-gray-400">You don't have any active farm houses yet.</p>
+        <p className="text-sm text-gray-500 italic">A farm house is required before you can register a new batch.</p>
+        <Button asChild className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold">
+          <Link href="/dashboard/houses">Add New House First</Link>
+        </Button>
+      </div>
+    );
+  }
 
   const houseOptions = houses.map(h => ({ label: h.name, value: h.id.toString() }));
   const breedOptions = [
@@ -59,6 +76,7 @@ export function RegisterBatchForm({ houses }: RegisterBatchFormProps) {
 
       if (result.success) {
         router.refresh();
+        if (onSuccess) onSuccess();
       } else {
         alert("Error: " + result.error);
       }
@@ -72,19 +90,21 @@ export function RegisterBatchForm({ houses }: RegisterBatchFormProps) {
   return (
     <div className="w-full max-w-lg">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <Input
-          label="Batch Name"
-          placeholder="e.g., Spring-Broiler-01"
-          {...register("batchName")}
-          error={errors.batchName?.message}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Batch Name"
+            placeholder="e.g., Spring-Broiler-01"
+            {...register("batchName")}
+            error={errors.batchName?.message}
+          />
 
-        <Select
-          label="Breed"
-          options={breedOptions}
-          {...register("breed")}
-          error={errors.breed?.message}
-        />
+          <Select
+            label="Breed"
+            options={breedOptions}
+            {...register("breed")}
+            error={errors.breed?.message}
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <Input
@@ -110,11 +130,27 @@ export function RegisterBatchForm({ houses }: RegisterBatchFormProps) {
           error={errors.hatchDate?.message}
         />
 
+        <div className="border-t border-white/10 pt-4 mt-2">
+          <h3 className="text-sm font-medium text-amber-400 mb-4">Initial Schedule (Optional)</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="1st Vaccination Date"
+              type="date"
+              {...register("vaccinationDate")}
+            />
+            <Input
+              label="Vaccine Name"
+              placeholder="Newcastle/IBD"
+              {...register("vaccineName")}
+            />
+          </div>
+        </div>
+
         <div className="pt-4">
           <Button
             type="submit"
             isLoading={isSubmitting}
-            className="w-full"
+            className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-black font-bold h-12 hover:scale-[1.02] transition-transform"
           >
             Register Batch
           </Button>
