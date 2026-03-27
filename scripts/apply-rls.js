@@ -47,7 +47,10 @@ async function applyRLS() {
       ['mortality', 'mortality_isolation_policy'],
       ['weight_records', 'weight_isolation_policy'],
       ['sales', 'sales_isolation_policy'],
-      ['sale_items', 'sale_items_isolation_policy']
+      ['sale_items', 'sale_items_isolation_policy'],
+      ['vaccination_schedules', 'vaccination_isolation_policy'],
+      ['medication_schedules', 'medication_isolation_policy'],
+      ['expenses', 'expenses_isolation_policy']
     ].map(([table, policy]) => [
       `DROP POLICY IF EXISTS ${policy} ON "${table}"`,
       `CREATE POLICY ${policy} ON "${table}" 

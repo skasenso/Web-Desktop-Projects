@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, Bird, Egg, ThermometerSun, 
   Wheat, Settings, Users, XCircle, Banknote,
-  ChevronRight, LogOut
+  ChevronRight, LogOut, Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,10 +18,12 @@ export const Sidebar = ({ role = 'OWNER' }: { role?: string }) => {
   const allNavItems = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', roles: ['OWNER', 'MANAGER'] },
     { name: 'Flocks', icon: Bird, href: '/dashboard/flocks', roles: ['OWNER', 'MANAGER'] },
+    { name: 'Houses', icon: ThermometerSun, href: '/dashboard/houses', roles: ['OWNER', 'MANAGER'] },
     { name: 'Eggs', icon: Egg, href: '/dashboard/eggs', roles: ['OWNER', 'MANAGER'] },
+    { name: 'Sales', icon: Banknote, href: '/dashboard/sales', roles: ['OWNER', 'MANAGER'] },
     { name: 'Mortality', icon: XCircle, href: '/dashboard/mortality', roles: ['OWNER', 'MANAGER', 'WORKER'] },
     { name: 'Feeding', icon: Wheat, href: '/dashboard/feed', roles: ['OWNER', 'MANAGER', 'WORKER'] },
-    { name: 'Sales', icon: Banknote, href: '/dashboard/sales', roles: ['OWNER', 'MANAGER'] },
+    { name: 'Finance', icon: Wallet, href: '/dashboard/finance', roles: ['OWNER', 'MANAGER'] },
     { name: 'Team', icon: Users, href: '/dashboard/team', roles: ['OWNER', 'MANAGER'] },
     { name: 'Settings', icon: Settings, href: '/dashboard/settings', roles: ['OWNER', 'MANAGER'] },
   ];

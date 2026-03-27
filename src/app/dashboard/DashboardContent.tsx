@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { RegisterBatchForm } from '@/components/forms/RegisterBatchForm';
 import { usePoultryStats } from '@/hooks/usePoultryStats';
 import { motion } from 'framer-motion';
-import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package, Eye, Banknote } from 'lucide-react';
+import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package, Eye, Banknote, Syringe } from 'lucide-react';
 import Link from 'next/link';
 import { Dialog } from '@/components/ui/Dialog';
 import { formatCurrency } from '@/lib/utils';
@@ -25,6 +25,12 @@ interface DashboardContentProps {
     feedTrendData: Array<{ date: string; count: number }>;
     revenueTrendData: Array<{ date: string; count: number }>;
     mortalityTrendData: Array<{ date: string; count: number }>;
+    alerts: Array<{
+      type: 'VACCINE' | 'MEDICATION' | 'EGGS' | 'FEED';
+      title: string;
+      message: string;
+      severity: 'warning' | 'error' | 'info';
+    }>;
     activeBatches: Array<{
       id: string;
       breed: string;
@@ -38,10 +44,12 @@ interface DashboardContentProps {
   houses: Array<{
     id: number;
     name: string;
+    currentTemperature: number | null;
+    currentHumidity: number | null;
   }>;
 }
 
-const FloatingIcon = ({ icon: Icon, className = "" }: { icon: any, className?: string }) => (
+const FloatingIcon = ({ icon: Icon, className = "" }: { icon: React.ElementType, className?: string }) => (
   <motion.div
     animate={{ y: [0, -8, 0] }}
     transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
@@ -185,16 +193,26 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2 lg:col-span-2 bg-purple-500/15 border-purple-500/20 relative overflow-hidden">
+        <Card className="md:col-span-2 lg:col-span-2 bg-purple-500/15 border-purple-500/20 relative overflow-hidden group">
           <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
             <CardTitle className="text-purple-400">Revenue (Cedi)</CardTitle>
             <Banknote className="w-5 h-5 text-purple-400/50" />
           </CardHeader>
           <CardContent className="relative z-10">
-            <p className="text-4xl font-black text-white tracking-tighter mb-1">
-              {formatCurrency(stats.revenueTrendData.reduce((acc, curr) => acc + curr.count, 0))}
-            </p>
-            <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">7 Day Sales Volume</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-4xl font-black text-white tracking-tighter mb-1">
+                  {formatCurrency(stats.revenueTrendData.reduce((acc, curr) => acc + curr.count, 0))}
+                </p>
+                <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic">7 Day Sales Volume</p>
+              </div>
+              <Link 
+                href="/dashboard/sales"
+                className="opacity-0 group-hover:opacity-100 transition-opacity bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border border-purple-500/20"
+              >
+                Manage Sales
+              </Link>
+            </div>
             <MiniBarChart data={stats.revenueTrendData.map(d => d.count)} color="bg-purple-400" />
           </CardContent>
         </Card>
@@ -206,33 +224,41 @@ export function DashboardContent({ stats, houses }: DashboardContentProps) {
             <Activity className="w-5 h-5 text-amber-400/50 flex-shrink-0" />
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto custom-scrollbar space-y-3 mt-2 pr-2">
+            {stats.alerts.map((alert, idx) => {
+              const Icon = alert.type === 'VACCINE' ? Syringe : 
+                           alert.type === 'MEDICATION' ? Activity : 
+                           alert.type === 'EGGS' ? Package : Wheat;
+              
+              const bgClass = alert.severity === 'error' ? 'bg-red-500/15 border-red-500/20' :
+                             alert.severity === 'warning' ? 'bg-amber-500/15 border-amber-500/20' :
+                             'bg-blue-500/15 border-blue-500/20';
+              
+              const textClass = alert.severity === 'error' ? 'text-red-400' :
+                               alert.severity === 'warning' ? 'text-amber-400' :
+                               'text-blue-400';
+
+              return (
+                <div key={`alert-${idx}`} className={`flex items-center gap-3 p-3 rounded-2xl border ${bgClass}`}>
+                  <Icon className={`w-5 h-5 ${textClass} flex-shrink-0`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-bold truncate">{alert.title}</p>
+                    <p className={`${textClass} text-[10px] uppercase tracking-widest font-black mt-0.5`}>{alert.message}</p>
+                  </div>
+                </div>
+              );
+            })}
+
             {stats.lowFeedItems.map((item, idx) => (
-               <div key={`feed-${idx}`} className="flex items-center gap-3 bg-amber-500/10 p-3 rounded-2xl border border-amber-500/20">
-                  <Wheat className="w-5 h-5 text-amber-500 flex-shrink-0" />
+               <div key={`feed-${idx}`} className="flex items-center gap-3 bg-red-500/15 p-3 rounded-2xl border border-red-500/20">
+                  <Wheat className="w-5 h-5 text-red-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                      <p className="text-white text-xs font-bold truncate">Low Stock: {item.name}</p>
-                     <p className="text-amber-500 text-[10px] uppercase tracking-widest font-black mt-0.5">{item.stockLevel} kg remaining</p>
+                     <p className="text-red-500 text-[10px] uppercase tracking-widest font-black mt-0.5">{item.stockLevel} kg remaining</p>
                   </div>
                </div>
             ))}
             
-            {/* Actionable Reminders Mock Panel */}
-            <div className="flex items-center gap-3 bg-blue-500/10 p-3 rounded-2xl border border-blue-500/20">
-              <Activity className="w-5 h-5 text-blue-400 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                 <p className="text-white text-xs font-bold truncate">Medication Reminder</p>
-                 <p className="text-blue-400 text-[10px] uppercase tracking-widest font-black mt-0.5">Vaccine: Flock #102</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3 bg-emerald-500/20 p-3 rounded-2xl border border-emerald-500/20">
-              <Package className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                 <p className="text-white text-xs font-bold truncate">Egg Collection</p>
-                 <p className="text-emerald-400 text-[10px] uppercase tracking-widest font-black mt-0.5">Evening: Due in 1 hour</p>
-              </div>
-            </div>
-            {stats.lowFeedAlertsCount === 0 && (
+            {stats.alerts.length === 0 && stats.lowFeedItems.length === 0 && (
               <div className="text-center py-8">
                  <p className="text-white/40 text-xs italic font-bold">No urgent alerts.</p>
               </div>

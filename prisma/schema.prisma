@@ -27,6 +27,7 @@ model User {
   memberships   FarmMember[]
   farms         Farm[]
   sessions      Session[]
+  expenses      Expense[]
 
   @@map("users")
 }
@@ -90,6 +91,9 @@ model Farm {
   weightRecords   WeightRecord[]
   sales           Sale[]
   saleItems       SaleItem[]
+  expenses        Expense[]
+  vaccinations    VaccinationSchedule[]
+  medications     MedicationSchedule[]
   settings        FarmSettings?
 
   @@index([userId])
@@ -321,11 +325,12 @@ model VaccinationSchedule {
   scheduledDate DateTime
   status        String   @default("PENDING") // PENDING, COMPLETED, SKIPPED
   notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  farmId        Int      @default(1)
+  farm          Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
   batch         Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([batchId])
+  @@index([farmId])
   @@map("vaccination_schedules")
 }
 
@@ -336,11 +341,12 @@ model MedicationSchedule {
   scheduledDate  DateTime
   status         String   @default("PENDING") // PENDING, COMPLETED, SKIPPED
   notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  farmId         Int      @default(1)
+  farm           Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
   batch          Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([batchId])
+  @@index([farmId])
   @@map("medication_schedules")
 }
 
@@ -371,4 +377,32 @@ model AuditLog {
   @@index([farmId])
   @@index([userId])
   @@map("audit_logs")
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  farmId      Int
+  userId      String   @map("user_id")
+  amount      Decimal  @db.Decimal(10, 2)
+  category    ExpenseCategory
+  description String?
+  expenseDate DateTime @default(now()) @map("expense_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  farm        Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([farmId])
+  @@index([userId])
+  @@map("expenses")
+}
+
+enum ExpenseCategory {
+  FEED
+  MEDICATION
+  EQUIPMENT
+  UTILITIES
+  SALARY
+  MAINTENANCE
+  OTHER
 }

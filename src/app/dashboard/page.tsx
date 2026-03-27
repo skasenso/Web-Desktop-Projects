@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     });
     
     // Serialize Decimal objects to numbers for Client Components
-    const houses = housesRaw.map((house: any) => ({
+    const houses = housesRaw.map((house: { id: number; name: string; currentTemperature: any; currentHumidity: any }) => ({
       ...house,
       currentTemperature: house.currentTemperature ? Number(house.currentTemperature) : null,
       currentHumidity: house.currentHumidity ? Number(house.currentHumidity) : null,

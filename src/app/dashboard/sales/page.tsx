@@ -15,8 +15,8 @@ export default async function SalesPage() {
     <div className="max-w-7xl mx-auto space-y-6 px-4 py-8">
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
-          <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Sales & Finance</h2>
-          <p className="text-gray-500 mt-1">Track your revenue and manage customer transactions.</p>
+          <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight text-emerald-600">Sales Management</h2>
+          <p className="text-gray-500 mt-1">Detailed transaction history, order tracking, and customer management.</p>
         </div>
         <SaleActionsHeader />
       </div>

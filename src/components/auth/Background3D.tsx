@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 
 export default function Background3D() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({
         x: (e.clientX / window.innerWidth - 0.5) * 20,
@@ -16,6 +18,8 @@ export default function Background3D() {
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
+
+  if (!mounted) return <div className="fixed inset-0 bg-[#0a0a0a]" />;
 
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden bg-[#0a0a0a]">
@@ -51,8 +55,17 @@ export default function Background3D() {
         className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-gradient-to-bl from-emerald-500/10 to-blue-500/20 blur-3xl"
       />
 
-      {/* Subtle Grid */}
-      <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03] [mask-image:radial-gradient(ellipse_at_center,black,transparent)]" />
+      {/* Subtle CSS Grid (Replacement for missing grid.svg) */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] [mask-image:radial-gradient(ellipse_at_center,black,transparent)]" 
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, #ffffff 1px, transparent 1px),
+            linear-gradient(to bottom, #ffffff 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px'
+        }}
+      />
     </div>
   );
 }

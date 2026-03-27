@@ -125,6 +125,62 @@ export async function getDashboardStats() {
       return { date, count: dayTotal }
     })
 
+    const todayStr = formatDate(new Date())
+
+    const upcomingVaccinations = await tx.vaccinationSchedule.findMany({
+      where: {
+        farmId: activeFarmId,
+        status: 'PENDING',
+        scheduledDate: {
+          lte: new Date(new Date().getTime() + 3 * 24 * 60 * 60 * 1000) // Next 3 days
+        }
+      },
+      include: { batch: true }
+    })
+
+    const pendingMedications = await tx.medicationSchedule.findMany({
+      where: {
+        farmId: activeFarmId,
+        status: 'PENDING'
+      },
+      include: { batch: true }
+    })
+
+    const batchesNeedingEggs = await tx.batch.findMany({
+      where: {
+        farmId: activeFarmId,
+        status: 'active',
+        eggProduction: {
+          none: {
+            logDate: {
+              gte: today
+            }
+          }
+        }
+      }
+    })
+
+    const dynamicAlerts = [
+      ...upcomingVaccinations.map((v: any) => ({
+        type: 'VACCINE',
+        title: 'Upcoming Vaccination',
+        message: `${v.vaccineName} for Flock ${v.batch.id}`,
+        severity: 'warning'
+      })),
+      ...pendingMedications.map((m: any) => ({
+        type: 'MEDICATION',
+        title: 'Medication Due',
+        message: `${m.medicationName} for Flock ${m.batch.id}`,
+        severity: 'error'
+      })),
+      ...batchesNeedingEggs.map((b: any) => ({
+        type: 'EGGS',
+        title: 'Egg Collection Due',
+        message: `Flock ${b.id} needs collection`,
+        severity: 'info'
+      }))
+    ]
+
     return {
       totalBirds: totalBirds._sum.currentCount || 0,
       mortalityRate: mortalityRate.toFixed(2),
@@ -134,6 +190,7 @@ export async function getDashboardStats() {
       todayEggs: todayEggs._sum.eggsCollected || 0,
       lowFeedAlertsCount: lowFeedAlerts.length,
       lowFeedItems: lowFeedAlerts.map((i: any) => ({ name: i.itemName, stockLevel: Number(i.stockLevel), category: i.category })),
+      alerts: dynamicAlerts,
       eggTrendData,
       feedTrendData,
       revenueTrendData,
